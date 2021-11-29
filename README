@@ -1,0 +1,59 @@
+XD Bar
+-------
+A minialistic statusbar for X11 Desktops, compatible with EWMH standards.
+Inspired by 'X'mobar and 'D'wm statusbar, written in 'C'.
+Why C? performance.
+If so, why not Rust? No official X11 lib, unecessary build dependencies.
+
+Build and install:
+------------------
+  make && sudo make install
+
+Build Requirements:
+-------------------
+  - GNU Make
+  - libx11
+  - libxft
+  - fontconfig
+
+How it renders:
+
+  ------------------------------------------------------------------------------
+  |STDIN                                                                WM_NAME|
+  ------------------------------------------------------------------------------
+
+'stdin' text is typically provided by the window manager
+'WM_NAME' (of the root window) can be set using the 'xsetroot' command.
+
+Setting 'WM_NAME' example (bash):
+---------------------------------
+  #!/bin/bash
+  while true; do
+    xsetroot -name "$(whoami)@$(hostname) on $(uname -o) | $(date)"
+    sleep(1)
+  done
+
+Styling text:
+-------------
+  Template:
+    <Tag:Extension=Val> Text </Tag>
+
+  Tags:
+    Fn, Fg, Bg, Box, BtnL, BtnM, BtnR, ScrlU, ScrlD
+  Extensions:
+    Shift, Ctrl, Super, Alt, Left, Right, Top, Bottom
+  Valid Extensions for Tag:
+    Fn:     -
+    Bg:     -
+    Box:    Left, Right, Top, Bottom
+    BtnL:   Shift, Ctrl, Super, Alt
+    BtnM:   Shift, Ctrl, Super, Alt
+    BtnR:   Shift, Ctrl, Super, Alt
+    ScrlU:  Shift, Ctrl, Super, Alt
+    ScrlD:  Shift, Ctrl, Super, Alt
+
+Example text:
+-------------
+  <Fg=#131313> Colored </Fg> text with <Bg=#c6c6c6> background</Bg>.
+  <Box:Bottom=#ffffff:1> underlined </Bottom> text.
+  <BtnL:Ctrl=amixer sset Master toggle> mute/unmute </BtnL>

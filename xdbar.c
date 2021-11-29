@@ -12,7 +12,7 @@
 
 #define NAME "xdbar"
 #define VERSION "0.1.0"
-#define STDIN_BUF_SIZE 1<<10
+#define STDIN_BUF_SIZE 1 << 10
 
 #define eprintf(...) fprintf(stderr, __VA_ARGS__);
 #define die(...)                                                               \
@@ -22,6 +22,10 @@
   } while (0);
 
 static const long NS_TO_MS = 1e6;
+
+typedef struct {
+  int x, width;
+} RenderInfo;
 
 typedef struct _ColorCache {
   char *name;
@@ -78,14 +82,6 @@ XftColor *get_cached_color(char *colorname) {
   return &ctx->colorcache->val;
 }
 
-void createrenderinfo(const char *text, int ntext, int fnindex,
-                      RenderInfo *renderinfo) {
-  XGlyphInfo extent;
-  XftTextExtentsUtf8(dpy, ctx->fonts[fnindex], (FcChar8 *)text, ntext, &extent);
-  renderinfo->x = extent.x;
-  renderinfo->width = extent.xOff;
-}
-
 int parseboxstring(const char *val, char color[24]) {
   int ptr = 0, c = 0, nval = strlen(val), size = 0;
   memset(color, 0, 24);
@@ -120,8 +116,8 @@ void createctx() {
 
 void createbar() {
   bar = (Bar *)malloc(sizeof(Bar));
-  bar->w = 1366, bar->h = barheight, bar->x = 0,
-  bar->y = topbar ? 0 : 768 - bar->h;
+  // @TODO: remove hard coded values.
+  bar->x = 0, bar->y = 768 - barheight, bar->w = 1366, bar->h = barheight;
 
   bar->xwindow =
       XCreateSimpleWindow(dpy, root, bar->x, bar->y, bar->w, bar->h, 0,
@@ -195,22 +191,18 @@ void xcleanup() {
 }
 
 void xrenderblks(Block *blks, int nblk) {
-  int starty = (bar->h - ctx->fonts[0]->height) / 2 + ctx->fonts[0]->ascent,
-      size;
+  int starty, size, fnindex;
   char color[24];
-  XftColor *fg, *bg;
+  XftColor *fg;
   Attribute *box;
 
   for (int i = 0; i < nblk; ++i) {
     Block *blk = &blks[i];
+    RenderInfo *renderinfo = (RenderInfo *)blk->data;
 
-    fg = blk->attrs[Fg] != NULL ? get_cached_color(blk->attrs[Fg]->val)
-                                : &bar->foreground;
-    bg = blk->attrs[Bg] != NULL ? get_cached_color(blk->attrs[Bg]->val)
-                                : &bar->background;
-
-    XftDrawRect(bar->drawable, bg, blk->renderinfo.x, 0, blk->renderinfo.width,
-                bar->h);
+    if (blk->attrs[Bg] != NULL)
+      XftDrawRect(bar->drawable, get_cached_color(blk->attrs[Bg]->val),
+                  renderinfo->x, 0, renderinfo->width, bar->h);
 
     box = blk->attrs[Box];
     while (box != NULL) {
@@ -219,19 +211,18 @@ void xrenderblks(Block *blks, int nblk) {
         int bx = 0, by = 0, bw = 0, bh = 0;
         switch (box->extension) {
         case Top:
-          bx = blk->renderinfo.x, by = 0,
-          bw = blk->renderinfo.x + blk->renderinfo.width, bh = size;
+          bx = renderinfo->x, by = 0, bw = renderinfo->width, bh = size;
           break;
         case Bottom:
-          bx = blk->renderinfo.x, by = bar->h - size,
-          bw = blk->renderinfo.x + blk->renderinfo.width, bh = size;
+          bx = renderinfo->x, by = bar->h - size, bw = renderinfo->width,
+          bh = size;
           break;
         case Left:
-          bx = blk->renderinfo.x, by = 0, bw = size, bh = bar->h;
+          bx = renderinfo->x, by = 0, bw = size, bh = bar->h;
           break;
         case Right:
-          bx = blk->renderinfo.x + blk->renderinfo.width - size, by = 0,
-          bw = size, bh = bar->h;
+          bx = renderinfo->x + renderinfo->width - size, by = 0, bw = size,
+          bh = bar->h;
           break;
         default:
           break;
@@ -242,32 +233,35 @@ void xrenderblks(Block *blks, int nblk) {
       box = box->previous;
     }
 
-    int fnindex = blk->attrs[Fn] != NULL ? atoi(blk->attrs[Fn]->val) : 0;
-    XftDrawStringUtf8(bar->drawable, fg, ctx->fonts[fnindex], blk->renderinfo.x,
+    fnindex = blk->attrs[Fn] != NULL ? atoi(blk->attrs[Fn]->val) : 0;
+    starty = (bar->h - ctx->fonts[fnindex]->height) / 2 +
+             ctx->fonts[fnindex]->ascent;
+    fg = blk->attrs[Fg] != NULL ? get_cached_color(blk->attrs[Fg]->val)
+                                : &bar->foreground;
+    XftDrawStringUtf8(bar->drawable, fg, ctx->fonts[fnindex], renderinfo->x,
                       starty, (FcChar8 *)blk->text, blk->ntext);
   }
 }
 
 void handlebuttonpress(Block *blk, XButtonEvent *e) {
-  AttrTag tag = e->button == Button1   ? BtnL
-                : e->button == Button2 ? BtnM
-                : e->button == Button3 ? BtnR
-                : e->button == Button4 ? ScrlU
-                : e->button == Button5 ? ScrlD
-                                       : NullAttrTag;
+  Tag tag = e->button == Button1   ? BtnL
+            : e->button == Button2 ? BtnM
+            : e->button == Button3 ? BtnR
+            : e->button == Button4 ? ScrlU
+            : e->button == Button5 ? ScrlD
+                                   : NullTag;
 
-  AttrExt ext = e->state == ShiftMask     ? Shift
-                : e->state == ControlMask ? Ctrl
-                : e->state == Mod1Mask    ? Super
-                : e->state == Mod4Mask    ? Alt
-                                          : NullAttrExt;
+  Extension ext = e->state == ShiftMask     ? Shift
+                  : e->state == ControlMask ? Ctrl
+                  : e->state == Mod1Mask    ? Super
+                  : e->state == Mod4Mask    ? Alt
+                                            : NullExt;
 
-  // @TODO: weird state/mask behaviour.
-  if (tag != NullAttrTag) {
+  if (tag != NullTag) {
     Attribute *action = blk->attrs[tag];
     while (action != NULL) {
       if (strlen(action->val) &&
-          (action->extension == NullAttrExt || action->extension == ext))
+          (action->extension == NullExt || action->extension == ext))
         system(action->val);
       action = action->previous;
     }
@@ -279,9 +273,20 @@ void createleftblks(char *buf, Block *blks, int *nblks) {
   *nblks = createblks(buf, blks);
 
   int renderx = 0;
+  XGlyphInfo extent;
+  RenderInfo *renderinfo;
   for (int i = 0; i < *nblks; ++i) {
-    blks[i].renderinfo.x = renderx + blks[i].renderinfo.x;
-    renderx += blks[i].renderinfo.width;
+    Block *blk = &blks[i];
+    int fnindex = blk->attrs[Fn] ? atoi(blk->attrs[Fn]->val) : 0;
+    XftTextExtentsUtf8(dpy, ctx->fonts[fnindex], (FcChar8 *)blk->text,
+                       blk->ntext, &extent);
+
+    renderinfo = malloc(sizeof(RenderInfo));
+    renderinfo->width = extent.xOff;
+    renderinfo->x = renderx + extent.x;
+    renderx += renderinfo->width;
+
+    blk->data = renderinfo;
   }
 }
 
@@ -290,9 +295,20 @@ void createrightblks(char *buf, Block *blks, int *nblks) {
   *nblks = createblks(buf, blks);
 
   int renderx = bar->w;
+  XGlyphInfo extent;
+  RenderInfo *renderinfo;
   for (int i = *nblks - 1; i >= 0; --i) {
-    renderx -= blks[i].renderinfo.x + blks[i].renderinfo.width;
-    blks[i].renderinfo.x = renderx;
+    Block *blk = &blks[i];
+    int fnindex = blk->attrs[Fn] ? atoi(blk->attrs[Fn]->val) : 0;
+    XftTextExtentsUtf8(dpy, ctx->fonts[fnindex], (FcChar8 *)blk->text,
+                       blk->ntext, &extent);
+
+    renderinfo = malloc(sizeof(RenderInfo));
+    renderinfo->width = extent.xOff;
+    renderx -= extent.x + extent.xOff;
+    renderinfo->x = renderx;
+
+    blk->data = renderinfo;
   }
 }
 
@@ -311,9 +327,8 @@ void getlastline(char *buf, int nchars, char *dest, int ndest) {
 
 int main(void) {
   XEvent e;
-  int nbuf, renderflag, eventflag;
+  int nbuf, renderflag, eventflag, nleftblks = 0, nrightblks = 0;
   char stdinbuf[STDIN_BUF_SIZE], *namebuf;
-  int nleftblks = 0, nrightblks = 0;
   Block leftblks[64], rightblks[64];
 
   struct timespec ts = {.tv_sec = 0, .tv_nsec = (long)25 * NS_TO_MS};
@@ -346,8 +361,8 @@ int main(void) {
       if (e.type == ButtonPress) {
         for (int i = 0; i < nleftblks + nrightblks; ++i) {
           Block *blk = i < nleftblks ? &leftblks[i] : &rightblks[i - nleftblks];
-          if (e.xbutton.x >= blk->renderinfo.x &&
-              e.xbutton.x <= blk->renderinfo.x + blk->renderinfo.width)
+          RenderInfo *ri = (RenderInfo *)blk->data;
+          if (e.xbutton.x >= ri->x && e.xbutton.x <= ri->x + ri->width)
             handlebuttonpress(blk, &e.xbutton);
         }
       }

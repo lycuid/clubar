@@ -1,15 +1,4 @@
-typedef enum {
-  Fn,
-  Fg,
-  Bg,
-  Box,
-  BtnL,
-  BtnM,
-  BtnR,
-  ScrlU,
-  ScrlD,
-  NullAttrTag
-} AttrTag;
+typedef enum { Fn, Fg, Bg, Box, BtnL, BtnM, BtnR, ScrlU, ScrlD, NullTag } Tag;
 
 typedef enum {
   Shift,
@@ -20,29 +9,33 @@ typedef enum {
   Right,
   Top,
   Bottom,
-  NullAttrExt
-} AttrExt;
+  NullExt
+} Extension;
 
-typedef enum { Cur, New } state_t;
+typedef enum { Cur, New } State;
 
 typedef struct _Attribute {
   char val[128];
-  AttrExt extension;
+  Extension extension;
   struct _Attribute *previous;
 } Attribute;
-
-typedef struct {
-  int x, width;
-} RenderInfo;
 
 typedef struct {
   char *text;
   int ntext;
   Attribute **attrs;
-  RenderInfo renderinfo;
+  void *data; // extra, custom info.
 } Block;
 
-void freeblks(Block *, int);
+char *tag_repr(Tag);
+char *ext_repr(Extension);
+void allowed_tag_extensions(Tag, Extension[NullExt]);
+Attribute *mkcopy(Attribute *);
+void push(Attribute **, char *, Extension, Attribute *);
+void pop(Attribute **);
+int parsetag(const char *, char *, Tag *, Extension *, int *);
 Block createblk(Attribute **, char *, int);
-int createblks(char *, Block *);
-void createrenderinfo(const char *, int, int, RenderInfo *);
+
+// public.
+void freeblks(Block *, int);
+int createblks(const char *, Block *);
