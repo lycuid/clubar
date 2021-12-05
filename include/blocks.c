@@ -92,12 +92,12 @@ void push(Attribute **root, char *val, Extension extension,
 }
 
 void pop(Attribute **attrs) {
-  Attribute *stale = *attrs;
-  *attrs = (*attrs)->previous;
+  Attribute *stale = (*attrs);
+  (*attrs) = (*attrs)->previous;
   free(stale);
 }
 
-int parsetag(const char *text, char *val, Tag *tag, Extension *ext,
+int parsetag(const char *text, Tag *tag, Extension *ext, char *val,
              int *closing) {
   int ptr = 0, nstart = strlen(ATTR_TAG_START), nend = strlen(ATTR_TAG_END),
       bufptr = 0;
@@ -147,21 +147,21 @@ int parsetag(const char *text, char *val, Tag *tag, Extension *ext,
   return ptr + nend - 1;
 }
 
-Block createblk(Attribute **attrs, char *text, int ntext) {
-  Block blk =
-      (Block){.text = calloc(ntext, sizeof(*text)),
-              .ntext = ntext,
-              .attrs = (Attribute **)malloc(NullTag * sizeof(Attribute *)),
-              .data = NULL};
+Block *createblk(Attribute **attrs, char *text, int ntext) {
+  Block *blk = (Block *)malloc(sizeof(Block));
+  blk->text = (char *)malloc(ntext * strlen(text));
+  strcpy(blk->text, text);
+  blk->ntext = ntext;
+  blk->attrs = (Attribute **)malloc(NullTag * sizeof(Attribute *));
+  blk->data = NULL;
 
-  memcpy(blk.text, text, ntext * sizeof(*text));
   for (int i = 0; i < NullTag; ++i)
-    blk.attrs[i] = mkcopy(attrs[i]);
+    blk->attrs[i] = mkcopy(attrs[i]);
 
   return blk;
 }
 
-int createblks(const char *name, Block *blks) {
+int createblks(const char *name, Block **blks) {
   int len = strlen(name), ptr = 0, nblks = 0, stateupdated = 0, nbuf = 0,
       tagclose;
   char buf[len], val[len];
@@ -180,7 +180,7 @@ int createblks(const char *name, Block *blks) {
     if (name[ptr] == ATTR_TAG_START[0]) {
       tagclose = 0;
       memset(val, 0, len);
-      int size = parsetag(name + ptr, val, &tag, &ext, &tagclose);
+      int size = parsetag(name + ptr, &tag, &ext, val, &tagclose);
       if (size > 0 && tag >= 0 && tag < NullTag) {
         ptr += size;
         stateupdated = 1;
@@ -226,9 +226,9 @@ int createblks(const char *name, Block *blks) {
   return nblks;
 }
 
-void freeblks(Block *blks, int nblks) {
-  for (int b = 0; b < nblks; ++b) {
-    Block *blk = &blks[b];
+void freeblks(Block **blks, int nblks) {
+  for (int b = 0; b < nblks && blks[b] != NULL; ++b) {
+    Block *blk = blks[b];
 
     for (int i = 0; i < NullTag; ++i)
       while (blk->attrs[i] != NULL)
@@ -238,5 +238,7 @@ void freeblks(Block *blks, int nblks) {
     free(blk->attrs);
     if (blk->data)
       free(blk->data);
+    free(blks[b]);
+    blks[b] = NULL;
   }
 }

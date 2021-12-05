@@ -33,9 +33,9 @@ void allowed_tag_extensions(Tag, Extension[NullExt]);
 Attribute *mkcopy(Attribute *);
 void push(Attribute **, char *, Extension, Attribute *);
 void pop(Attribute **);
-int parsetag(const char *, char *, Tag *, Extension *, int *);
-Block createblk(Attribute **, char *, int);
+int parsetag(const char *, Tag *, Extension *, char *, int *);
+Block *createblk(Attribute **, char *, int);
 
 // public.
-void freeblks(Block *, int);
-int createblks(const char *, Block *);
+void freeblks(Block **, int);
+int createblks(const char *, Block **);

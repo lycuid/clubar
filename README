@@ -2,8 +2,11 @@ XD Bar
 -------
 A minialistic statusbar for X11 Desktops, compatible with EWMH standards.
 Inspired by 'X'mobar and 'D'wm statusbar, written in 'C'.
+
 Why C? performance.
-If so, why not Rust? No official X11 lib, unecessary build dependencies.
+If so, why not Rust? No official X11 lib, writing FFI for X11 was delightfully
+painful.
+Future Goals: Rewrite in Rust. :pepehands:
 
 Build and install:
 ------------------
@@ -17,33 +20,42 @@ Build Requirements:
   - fontconfig
 
 How it renders:
+---------------
 
   ------------------------------------------------------------------------------
-  |STDIN                                                                WM_NAME|
+  |stdin                                                                WM_NAME|
   ------------------------------------------------------------------------------
 
-'stdin' text is typically provided by the window manager
-'WM_NAME' (of the root window) can be set using the 'xsetroot' command.
+  'stdin' text is typically provided by the window manager
+  'WM_NAME' (of the root window) can be set using the 'xsetroot' command.
 
-Setting 'WM_NAME' example (bash):
----------------------------------
-  #!/bin/bash
-  while true; do
-    xsetroot -name "$(whoami)@$(hostname) on $(uname -o) | $(date)"
-    sleep(1)
-  done
+Setting 'WM_NAME':
+------------------
+  - slstatus <https://tools.suckless.org/slstatus>
+  - xdstatus (better than slstatus) <https://github.com/lycuid/xdstatus>
+
+  - Custom script example (using bash):
+
+    #!/bin/bash
+    while true; do
+      xsetroot -name "$(whoami)@$(hostname) on $(uname -o) | $(date)"
+      sleep(1)
+    done
 
 Styling text:
 -------------
-  Template:
+  Template for styling text:
     <Tag:Extension=Val> Text </Tag>
 
-  Tags:
+  Valid Tags:
     Fn, Fg, Bg, Box, BtnL, BtnM, BtnR, ScrlU, ScrlD
-  Extensions:
+
+  Valid Extensions:
     Shift, Ctrl, Super, Alt, Left, Right, Top, Bottom
+
   Valid Extensions for Tag:
     Fn:     -
+    Fg:     -
     Bg:     -
     Box:    Left, Right, Top, Bottom
     BtnL:   Shift, Ctrl, Super, Alt
@@ -52,8 +64,24 @@ Styling text:
     ScrlU:  Shift, Ctrl, Super, Alt
     ScrlD:  Shift, Ctrl, Super, Alt
 
+  Valid values for Tags:
+    Fn:     ColorName             (eg. black, #000000)
+    Bg:     ColorName             (eg. black, #000000)
+    Box:    ColorName:pixelsize   (eg. yellow:1, #cccccc:2)
+    BtnL:   Command               (eg. systemctl poweroff)
+    BtnM:   Command               (eg. systemctl poweroff)
+    BtnR:   Command               (eg. systemctl poweroff)
+    ScrlU:  Command               (eg. systemctl poweroff)
+    ScrlD:  Command               (eg. systemctl poweroff)
+
 Example text:
 -------------
-  <Fg=#131313> Colored </Fg> text with <Bg=#c6c6c6> background</Bg>.
-  <Box:Bottom=#ffffff:1> underlined </Bottom> text.
-  <BtnL:Ctrl=amixer sset Master toggle> mute/unmute </BtnL>
+  - <Fg=#131313> Colored </Fg> text with <Bg=#c6c6c6> background</Bg>.
+
+  - <Box:Bottom=#ffffff:1> underlined </Bottom> text.
+
+  - <BtnL=systemctl reboot> reboot </BtnL>
+
+  - <ScrlU:Shift=amixer sset Master 5%+><ScrlD:Shift=amixer sset Master 5%->
+      volume
+    </ScrlD></ScrlU>
