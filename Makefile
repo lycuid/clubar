@@ -7,12 +7,19 @@ PREFIX=/usr/local
 BINPREFIX=$(PREFIX)/bin
 
 INC=-I/usr/include/freetype2 -Iinclude
-LIBS=-lX11 -lfontconfig -lXft
-CFLAGS=-Wall -pedantic
+LDFLAGS=-lX11 -lfontconfig -lXft
+CFLAGS=-Wall -pedantic -O3
 
 build: clean include.o
 	mkdir -p $(BUILDDIR)
-	$(CC) $(CFLAGS) $(LIBS) $(INC) -o $(BIN) $(NAME).c *.o
+	$(CC) $(CFLAGS) $(LDFLAGS) $(INC) -o $(BIN) $(NAME).c *.o
+
+options:
+	@echo xdbar build options:
+	@echo "CFLAGS   = $(CFLAGS)"
+	@echo "LDFLAGS  = $(LDFLAGS)"
+	@echo "INC      = $(INC)"
+	@echo "CC       = $(CC)"
 
 include.o:
 	$(CC) $(CFLAGS) -c include/*.c
@@ -20,7 +27,7 @@ include.o:
 .PHONY: dbg
 dbg:
 	mkdir -p $(DEBUGDIR)
-	$(CC) $(CFLAGS) $(LIBS) $(INC) -ggdb -o $(DEBUGDIR)/$(NAME) $(NAME).c include/*.c
+	$(CC) $(CFLAGS) $(LDFLAGS) $(INC) -ggdb -o $(DEBUGDIR)/$(NAME) $(NAME).c include/*.c
 
 .PHONY: debug
 debug: dbg
@@ -33,7 +40,7 @@ run: build
 clean:
 	rm -rf $(BUILDDIR) $(DEBUGDIR) *.o
 
-install: $(BIN)
+install: options $(BIN)
 	mkdir -p $(DESTDIR)$(BINPREFIX)
 	strip $(BIN)
 	cp $(BIN) $(DESTDIR)$(BINPREFIX)/$(NAME)

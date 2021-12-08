@@ -65,7 +65,9 @@ Styling text:
     ScrlD:  Shift, Ctrl, Super, Alt
 
   Valid values for Tags:
-    Fn:     ColorName             (eg. black, #000000)
+    Fn:     Number                (index of 'fonts' defined in 'config.h'
+                                    starting from 1.)
+    Fg:     ColorName             (eg. black, #000000)
     Bg:     ColorName             (eg. black, #000000)
     Box:    ColorName:pixelsize   (eg. yellow:1, #cccccc:2)
     BtnL:   Command               (eg. systemctl poweroff)
