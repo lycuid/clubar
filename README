@@ -32,7 +32,8 @@ How it renders:
 Setting 'WM_NAME':
 ------------------
   - slstatus <https://tools.suckless.org/slstatus>
-  - xdstatus (better than slstatus) <https://github.com/lycuid/xdstatus>
+  - xdstatus <https://github.com/lycuid/xdstatus> (much faster and overall better
+    than slstatus...coz. Rust. I guess?).
 
   - Custom script example (using bash):
 

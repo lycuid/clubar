@@ -10,9 +10,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#define NAME "xdbar"
-#define VERSION "0.1.0"
-
 #define eprintf(...) fprintf(stderr, __VA_ARGS__);
 #define die(...)                                                               \
   do {                                                                         \
@@ -23,8 +20,6 @@
 
 #define STDIN_BUF_SIZE 1 << 10
 #define BLOCKS_SIZE 1 << 6
-
-static const long int NS_TO_MS = 1e6;
 
 typedef struct {
   int x, width;
@@ -57,13 +52,17 @@ void createbar();
 void xsetup();
 void xsetatoms();
 void xcleanup();
-void xrenderblks(Block **, int);
+void xrenderblks(Block **, int, RenderInfo **);
 
 static Context *ctx;
 static Bar *bar;
 static Display *dpy;
 static int scr;
 static Window root;
+
+static Block *BLKS[2][BLOCKS_SIZE];
+static RenderInfo *INFOS[2][BLOCKS_SIZE];
+static int NBLKS[2];
 
 XftColor *get_cached_color(char *colorname) {
   ColorCache *cache = ctx->colorcache;
@@ -120,7 +119,7 @@ void createctx() {
 void createbar() {
   bar = (Bar *)malloc(sizeof(Bar));
   // @TODO: remove hard coded values.
-  bar->x = 0, bar->y = 768 - barheight, bar->w = 1366, bar->h = barheight;
+  bar->x = 0, bar->y = 768 - barheight, bar->w = barwidth, bar->h = barheight;
 
   bar->xwindow =
       XCreateSimpleWindow(dpy, root, bar->x, bar->y, bar->w, bar->h, 0,
@@ -193,7 +192,7 @@ void xcleanup() {
   XCloseDisplay(dpy);
 }
 
-void xrenderblks(Block **blks, int nblk) {
+void xrenderblks(Block **blks, int nblk, RenderInfo **renderinfos) {
   int starty, size, fnindex;
   char color[24];
   XftColor *fg;
@@ -201,11 +200,11 @@ void xrenderblks(Block **blks, int nblk) {
 
   for (int i = 0; i < nblk; ++i) {
     Block *blk = blks[i];
-    RenderInfo *renderinfo = (RenderInfo *)blk->data;
+    RenderInfo *ri = renderinfos[i];
 
     if (blk->attrs[Bg] != NULL)
-      XftDrawRect(bar->drawable, get_cached_color(blk->attrs[Bg]->val),
-                  renderinfo->x, 0, renderinfo->width, bar->h);
+      XftDrawRect(bar->drawable, get_cached_color(blk->attrs[Bg]->val), ri->x,
+                  0, ri->width, bar->h);
 
     box = blk->attrs[Box];
     while (box != NULL) {
@@ -214,18 +213,16 @@ void xrenderblks(Block **blks, int nblk) {
         int bx = 0, by = 0, bw = 0, bh = 0;
         switch (box->extension) {
         case Top:
-          bx = renderinfo->x, by = 0, bw = renderinfo->width, bh = size;
+          bx = ri->x, by = 0, bw = ri->width, bh = size;
           break;
         case Bottom:
-          bx = renderinfo->x, by = bar->h - size, bw = renderinfo->width,
-          bh = size;
+          bx = ri->x, by = bar->h - size, bw = ri->width, bh = size;
           break;
         case Left:
-          bx = renderinfo->x, by = 0, bw = size, bh = bar->h;
+          bx = ri->x, by = 0, bw = size, bh = bar->h;
           break;
         case Right:
-          bx = renderinfo->x + renderinfo->width - size, by = 0, bw = size,
-          bh = bar->h;
+          bx = ri->x + ri->width - size, by = 0, bw = size, bh = bar->h;
           break;
         default:
           break;
@@ -241,143 +238,148 @@ void xrenderblks(Block **blks, int nblk) {
              ctx->fonts[fnindex]->ascent;
     fg = blk->attrs[Fg] != NULL ? get_cached_color(blk->attrs[Fg]->val)
                                 : &bar->foreground;
-    XftDrawStringUtf8(bar->drawable, fg, ctx->fonts[fnindex], renderinfo->x,
-                      starty, (FcChar8 *)blk->text, blk->ntext);
+    XftDrawStringUtf8(bar->drawable, fg, ctx->fonts[fnindex], ri->x, starty,
+                      (FcChar8 *)blk->text, blk->ntext);
   }
 }
 
-void handlebuttonpress(Block *blk, XButtonEvent *e) {
-  Tag tag = e->button == Button1   ? BtnL
-            : e->button == Button2 ? BtnM
-            : e->button == Button3 ? BtnR
-            : e->button == Button4 ? ScrlU
-            : e->button == Button5 ? ScrlD
-                                   : NullTag;
+void handle_buttonpress(XButtonEvent *btn) {
+  for (int i = 0; i < NBLKS[0] + NBLKS[1]; ++i) {
+    Block *blk = i < NBLKS[0] ? BLKS[0][i] : BLKS[1][i - NBLKS[0]];
+    RenderInfo *ri = i < NBLKS[0] ? INFOS[0][i] : INFOS[1][i - NBLKS[0]];
 
-  Extension ext = e->state == ShiftMask     ? Shift
-                  : e->state == ControlMask ? Ctrl
-                  : e->state == Mod1Mask    ? Super
-                  : e->state == Mod4Mask    ? Alt
-                                            : NullExt;
+    if (btn->x >= ri->x && btn->x <= ri->x + ri->width) {
+      Tag tag = btn->button == Button1   ? BtnL
+                : btn->button == Button2 ? BtnM
+                : btn->button == Button3 ? BtnR
+                : btn->button == Button4 ? ScrlU
+                : btn->button == Button5 ? ScrlD
+                                         : NullTag;
 
-  if (tag != NullTag) {
-    Attribute *action = blk->attrs[tag];
-    while (action != NULL) {
-      if (strlen(action->val) &&
-          (action->extension == NullExt || action->extension == ext))
-        system(action->val);
-      action = action->previous;
+      Extension ext = btn->state == ShiftMask     ? Shift
+                      : btn->state == ControlMask ? Ctrl
+                      : btn->state == Mod1Mask    ? Super
+                      : btn->state == Mod4Mask    ? Alt
+                                                  : NullExt;
+
+      if (tag != NullTag) {
+        Attribute *action = blk->attrs[tag];
+        while (action != NULL) {
+          if (strlen(action->val) &&
+              (action->extension == NullExt || action->extension == ext))
+            system(action->val);
+          action = action->previous;
+        }
+      }
+      break;
     }
   }
-
-  // @TODO: Temporary fix, but in some cases, 'stdin' starts blocking in the
-  // mainloop after running 'system' function.
+  // @TODO: indentify and fix this problem.
+  // *problem: stdin starts blocking in some cases, after calling 'system' func.
   fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK);
 }
 
-void createleftblks(char *buf, Block **blks, int *nblks) {
-  freeblks(blks, BLOCKS_SIZE);
-  *nblks = createblks(buf, blks);
-
-  int renderx = 0;
-  XGlyphInfo extent;
-  RenderInfo *renderinfo;
-  for (int i = 0; i < *nblks; ++i) {
-    Block *blk = blks[i];
-    int fnindex = blk->attrs[Fn] ? atoi(blk->attrs[Fn]->val) : 0;
-    XftTextExtentsUtf8(dpy, ctx->fonts[fnindex], (FcChar8 *)blk->text,
-                       blk->ntext, &extent);
-
-    renderinfo = malloc(sizeof(RenderInfo));
-    renderinfo->width = extent.xOff;
-    renderinfo->x = renderx + extent.x;
-    renderx += renderinfo->width;
-
-    blk->data = renderinfo;
+void freeinfos(RenderInfo **infos) {
+  for (int i = 0; i < BLOCKS_SIZE; ++i) {
+    if (infos[i] != NULL) {
+      free(infos[i]);
+      infos[i] = NULL;
+    }
   }
 }
 
-void createrightblks(char *buf, Block **blks, int *nblks) {
-  freeblks(blks, BLOCKS_SIZE);
-  *nblks = createblks(buf, blks);
+void handle_stdin(char *stdinbuf, size_t nbuf) {
+  for (int i = 0; i < nbuf; ++i) {
+    if (stdinbuf[i] == '\n') {
+      stdinbuf[i] = 0;
+      break;
+    }
+  }
 
-  int renderx = bar->w;
+  freeblks(BLKS[0], BLOCKS_SIZE);
+  NBLKS[0] = createblks(stdinbuf, BLKS[0]);
+
+  int renderx = 0;
   XGlyphInfo extent;
-  RenderInfo *renderinfo;
-  for (int i = *nblks - 1; i >= 0; --i) {
-    Block *blk = blks[i];
+  freeinfos(INFOS[0]);
+  for (int i = 0; i < NBLKS[0]; ++i) {
+    Block *blk = BLKS[0][i];
     int fnindex = blk->attrs[Fn] ? atoi(blk->attrs[Fn]->val) : 0;
     XftTextExtentsUtf8(dpy, ctx->fonts[fnindex], (FcChar8 *)blk->text,
                        blk->ntext, &extent);
 
-    renderinfo = malloc(sizeof(RenderInfo));
-    renderinfo->width = extent.xOff;
-    renderx -= extent.x + extent.xOff;
-    renderinfo->x = renderx;
+    INFOS[0][i] = (RenderInfo *)malloc(sizeof(RenderInfo));
+    INFOS[0][i]->width = extent.xOff;
+    INFOS[0][i]->x = renderx + extent.x;
+    renderx += INFOS[0][i]->width;
+  }
 
-    blk->data = renderinfo;
+  memset(stdinbuf, 0, STDIN_BUF_SIZE);
+}
+
+void handle_wmname(char *wmname) {
+  freeblks(BLKS[1], BLOCKS_SIZE);
+  NBLKS[1] = createblks(wmname, BLKS[1]);
+
+  int renderx = bar->w;
+  XGlyphInfo extent;
+  freeinfos(INFOS[1]);
+  for (int i = NBLKS[1] - 1; i >= 0; --i) {
+    Block *blk = BLKS[1][i];
+    int fnindex = blk->attrs[Fn] ? atoi(blk->attrs[Fn]->val) : 0;
+    XftTextExtentsUtf8(dpy, ctx->fonts[fnindex], (FcChar8 *)blk->text,
+                       blk->ntext, &extent);
+
+    INFOS[1][i] = (RenderInfo *)malloc(sizeof(RenderInfo));
+    INFOS[1][i]->width = extent.xOff;
+    renderx -= extent.x + extent.xOff;
+    INFOS[1][i]->x = renderx;
   }
 }
 
 int main(void) {
   XEvent e;
-  int nbuf, renderflag, eventflag, nleftblks = 0, nrightblks = 0;
-  char stdinbuf[STDIN_BUF_SIZE], *wm_namebuf;
-  memset(stdinbuf, 0, STDIN_BUF_SIZE);
-  Block *leftblks[BLOCKS_SIZE], *rightblks[BLOCKS_SIZE];
-
-  for (int i = 0; i < BLOCKS_SIZE; ++i) {
-    leftblks[i] = NULL;
-    rightblks[i] = NULL;
+  char *wmname;
+  for (int i = 0; i < 2; ++i) {
+    for (int j = 0; j < BLOCKS_SIZE; ++j) {
+      BLKS[i][j] = NULL;
+      INFOS[i][j] = NULL;
+    }
+    NBLKS[i] = 0;
   }
 
-  struct timespec ts = {.tv_sec = 0, .tv_nsec = (long)25 * NS_TO_MS};
+  size_t nbuf;
+  char stdinbuf[STDIN_BUF_SIZE];
+  struct timespec ts = {.tv_nsec = 1e6 * 25};
+  int renderflag = 0;
+
+  memset(stdinbuf, 0, STDIN_BUF_SIZE);
   fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK);
 
   xsetup();
   while (1) {
     nanosleep(&ts, &ts);
-    renderflag = 0, eventflag = 0;
+    renderflag = 0;
 
     if (XPending(dpy)) {
       XNextEvent(dpy, &e);
-      eventflag = 1;
-    }
-
-    if ((nbuf = read(STDIN_FILENO, &stdinbuf, STDIN_BUF_SIZE)) > 0) {
-      for (int i = 0; i < nbuf; ++i) {
-        if (stdinbuf[i] == '\n') {
-          stdinbuf[i] = 0;
-          break;
-        }
-      }
-
-      createleftblks(stdinbuf, leftblks, &nleftblks);
-      memset(stdinbuf, 0, STDIN_BUF_SIZE);
-      renderflag = 1;
-    }
-
-    if (eventflag) {
-      if ((e.type == Expose || e.xproperty.window == root) &&
-          XFetchName(dpy, root, &wm_namebuf) >= 0) {
-        createrightblks(wm_namebuf, rightblks, &nrightblks);
+      if (e.type == ButtonPress)
+        handle_buttonpress(&e.xbutton);
+      if (e.xproperty.window == root && XFetchName(dpy, root, &wmname) >= 0) {
+        handle_wmname(wmname);
         renderflag = 1;
       }
+    }
 
-      if (e.type == ButtonPress) {
-        for (int i = 0; i < nleftblks + nrightblks; ++i) {
-          Block *blk = i < nleftblks ? leftblks[i] : rightblks[i - nleftblks];
-          RenderInfo *ri = (RenderInfo *)blk->data;
-          if (e.xbutton.x >= ri->x && e.xbutton.x <= ri->x + ri->width)
-            handlebuttonpress(blk, &e.xbutton);
-        }
-      }
+    if ((nbuf = read(STDIN_FILENO, &stdinbuf, STDIN_BUF_SIZE)) != -1) {
+      handle_stdin(stdinbuf, nbuf);
+      renderflag = 1;
     }
 
     if (renderflag) {
       clearbar();
-      xrenderblks(leftblks, nleftblks);
-      xrenderblks(rightblks, nrightblks);
+      xrenderblks(BLKS[0], NBLKS[0], INFOS[0]);
+      xrenderblks(BLKS[1], NBLKS[1], INFOS[1]);
     }
   }
 

@@ -3,55 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-char *tag_repr(Tag tag) {
-  switch (tag) {
-  case Fn:
-    return "Fn";
-  case Fg:
-    return "Fg";
-  case Bg:
-    return "Bg";
-  case Box:
-    return "Box";
-  case BtnL:
-    return "BtnL";
-  case BtnM:
-    return "BtnM";
-  case BtnR:
-    return "BtnR";
-  case ScrlU:
-    return "ScrlU";
-  case ScrlD:
-    return "ScrlD";
-  default:
-    return NULL;
-  }
-}
-
-char *ext_repr(Extension ext) {
-  switch (ext) {
-  case Shift:
-    return ":Shift";
-  case Ctrl:
-    return ":Ctrl";
-  case Super:
-    return ":Super";
-  case Alt:
-    return ":Alt";
-  case Left:
-    return ":Left";
-  case Right:
-    return ":Right";
-  case Top:
-    return ":Top";
-  case Bottom:
-    return ":Bottom";
-  default:
-    return NULL;
-  }
-}
+#define LOOP(cond) while ((cond))
 
 void allowed_tag_extensions(Tag tag, Extension extensions[NullExt]) {
+  // Always end with 'NullExt'.
   switch (tag) {
   case Box: {
     Extension temp[5] = {Left, Right, Top, Bottom, NullExt};
@@ -82,78 +37,72 @@ Attribute *mkcopy(Attribute *root) {
   return attr;
 }
 
-void push(Attribute **root, char *val, Extension extension,
-          Attribute *previous) {
+Attribute *push(const char *val, Extension extension, Attribute *previous) {
   Attribute *attribute = (Attribute *)malloc(sizeof(Attribute));
   strcpy(attribute->val, val);
   attribute->extension = extension;
   attribute->previous = previous;
-  *root = attribute;
+  return attribute;
 }
 
-void pop(Attribute **attrs) {
-  Attribute *stale = (*attrs);
-  (*attrs) = (*attrs)->previous;
+Attribute *pop(Attribute *stale) {
+  if (stale == NULL)
+    return NULL;
+  Attribute *attr = stale->previous;
   free(stale);
+  return attr;
 }
 
 int parsetag(const char *text, Tag *tag, Extension *ext, char *val,
              int *closing) {
-  int ptr = 0, nstart = strlen(ATTR_TAG_START), nend = strlen(ATTR_TAG_END),
-      bufptr = 0;
+  int ptr = 0, nstart = strlen(TAG_START), nend = strlen(TAG_END), bufptr = 0;
 
-  if (memcmp(text + ptr, ATTR_TAG_START, nstart) != 0)
+  if (memcmp(text + ptr, TAG_START, nstart) != 0)
     return 0;
   ptr += nstart;
   *closing = text[ptr] == '/' && ptr++;
 
-  Extension extensions[NullExt];
-  for (int i = 0; i < NullExt; ++i)
-    extensions[i] = NullExt;
-
   for (Tag t = 0; t < NullTag; ++t) {
-    char *s_tag = tag_repr(t);
-    if (s_tag != NULL && memcmp(text + ptr, s_tag, strlen(s_tag)) == 0) {
-      ptr += strlen(s_tag);
+    const char *tag_repr = TagRepr[t];
+    if (memcmp(text + ptr, tag_repr, strlen(tag_repr)) == 0) {
+      ptr += strlen(tag_repr);
       *tag = t;
-
-      allowed_tag_extensions(t, extensions);
-      for (int e = 0; extensions[e] != NullExt; ++e) {
-        char *s_ext = ext_repr(extensions[e]);
-        if (s_ext != NULL && memcmp(text + ptr, s_ext, strlen(s_ext)) == 0) {
-          ptr += strlen(s_ext);
-          *ext = extensions[e];
-          break;
-        }
-      }
-
       break;
     }
   }
-
   if (*tag == NullTag)
     return 0;
 
   if (!*closing) {
+    Extension extensions[NullExt] = {NullExt};
+    allowed_tag_extensions(*tag, extensions);
+    for (int e = 0; extensions[e] != NullExt; ++e) {
+      const char *ext_repr = ExtRepr[extensions[e]];
+      if (memcmp(text + ptr, ext_repr, strlen(ext_repr)) == 0) {
+        ptr += strlen(ext_repr);
+        *ext = extensions[e];
+        break;
+      }
+    }
+
     if (text[ptr++] != '=')
       return 0;
-    while (text[ptr] != ATTR_TAG_END[0])
+    while (text[ptr] != TAG_END[0])
       val[bufptr++] = text[ptr++];
   }
 
-  if (memcmp(text + ptr, ATTR_TAG_END, nend) != 0)
+  if (memcmp(text + ptr, TAG_END, nend) != 0)
     return 0;
 
   return ptr + nend - 1;
 }
 
-Block *createblk(Attribute **attrs, char *text, int ntext) {
+Block *createblk(Attribute **attrs, const char *text, int ntext) {
   Block *blk = (Block *)malloc(sizeof(Block));
   blk->text = (char *)malloc(ntext * strlen(text));
   strcpy(blk->text, text);
   blk->ntext = ntext;
   blk->attrs = (Attribute **)malloc(NullTag * sizeof(Attribute *));
-  blk->data = NULL;
 
   for (int i = 0; i < NullTag; ++i)
     blk->attrs[i] = mkcopy(attrs[i]);
@@ -162,9 +111,10 @@ Block *createblk(Attribute **attrs, char *text, int ntext) {
 }
 
 int createblks(const char *name, Block **blks) {
-  int len = strlen(name), ptr = 0, nblks = 0, stateupdated = 0, nbuf = 0,
-      tagclose;
+  int len = strlen(name), nblks = 0, nbuf = 0, ptr, stateupdated, tagclose;
   char buf[len], val[len];
+  Tag tag;
+  Extension ext;
 
   Attribute *attrstate[2][NullTag];
   for (Tag tag = 0; tag < NullTag; ++tag) {
@@ -173,26 +123,19 @@ int createblks(const char *name, Block **blks) {
   }
 
   for (ptr = 0; ptr < len; ++ptr) {
-    Tag tag = NullTag;
-    Extension ext = NullExt;
-    stateupdated = 0;
+    tag = NullTag, stateupdated = 0;
 
-    if (name[ptr] == ATTR_TAG_START[0]) {
-      tagclose = 0;
-      memset(val, 0, len);
+    if (name[ptr] == TAG_START[0]) {
+      ext = NullExt, tagclose = 0;
+      memset(val, 0, sizeof(val));
       int size = parsetag(name + ptr, &tag, &ext, val, &tagclose);
-      if (size > 0 && tag >= 0 && tag < NullTag) {
-        ptr += size;
-        stateupdated = 1;
-        if (tagclose) {
-          if (attrstate[New][tag] != NULL)
-            pop(&attrstate[New][tag]);
-          else {
-            stateupdated = 0;
-            ptr -= size;
-          }
-        } else
-          push(&attrstate[New][tag], val, ext, attrstate[New][tag]);
+      if (size > 0 && tag != NullTag) {
+        // On tag parse success, the only time state is not updated is when tag
+        // is closed, with no corresponding opening tag.
+        stateupdated = !(tagclose && attrstate[New][tag] == NULL);
+        ptr += stateupdated ? size : 0;
+        attrstate[New][tag] = tagclose ? pop(attrstate[New][tag])
+                                       : push(val, ext, attrstate[New][tag]);
       }
     }
 
@@ -200,13 +143,11 @@ int createblks(const char *name, Block **blks) {
       if (nbuf)
         blks[nblks++] = createblk(attrstate[Cur], buf, nbuf);
 
-      if (tag >= 0 && tag < NullTag) {
-        while (attrstate[Cur][tag] != NULL)
-          pop(&attrstate[Cur][tag]);
+      if (tag != NullTag) {
+        LOOP(attrstate[Cur][tag] = pop(attrstate[Cur][tag]));
         attrstate[Cur][tag] = mkcopy(attrstate[New][tag]);
       }
-      nbuf = 0;
-      memset(buf, 0, len);
+      memset(buf, nbuf = 0, sizeof(buf));
       continue;
     }
 
@@ -217,10 +158,8 @@ int createblks(const char *name, Block **blks) {
     blks[nblks++] = createblk(attrstate[Cur], buf, nbuf);
 
   for (int i = 0; i < NullTag; ++i) {
-    while (attrstate[Cur][i] != NULL)
-      pop(&attrstate[Cur][i]);
-    while (attrstate[New][i] != NULL)
-      pop(&attrstate[New][i]);
+    LOOP(attrstate[Cur][i] = pop(attrstate[Cur][i]));
+    LOOP(attrstate[New][i] = pop(attrstate[New][i]));
   }
 
   return nblks;
@@ -231,13 +170,10 @@ void freeblks(Block **blks, int nblks) {
     Block *blk = blks[b];
 
     for (int i = 0; i < NullTag; ++i)
-      while (blk->attrs[i] != NULL)
-        pop(&blk->attrs[i]);
+      LOOP(blk->attrs[i] = pop(blk->attrs[i]));
 
     free(blk->text);
     free(blk->attrs);
-    if (blk->data)
-      free(blk->data);
     free(blks[b]);
     blks[b] = NULL;
   }

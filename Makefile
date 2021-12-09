@@ -7,7 +7,7 @@ PREFIX=/usr/local
 BINPREFIX=$(PREFIX)/bin
 
 INC=-I/usr/include/freetype2 -Iinclude
-LDFLAGS=-lX11 -lfontconfig -lXft
+LDFLAGS=-lX11 -lpthread -lfontconfig -lXft
 CFLAGS=-Wall -pedantic -O3
 
 build: clean include.o
