@@ -5,6 +5,7 @@
 #include <X11/Xutil.h>
 #include <blocks.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <time.h>
@@ -338,6 +339,10 @@ void handle_wmname(char *wmname) {
 }
 
 int main(void) {
+  signal(SIGINT, xcleanup);
+  signal(SIGHUP, xcleanup);
+  signal(SIGTERM, xcleanup);
+
   XEvent e;
   char *wmname;
   for (int i = 0; i < 2; ++i) {
