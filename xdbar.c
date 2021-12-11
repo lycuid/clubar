@@ -5,6 +5,7 @@
 #include <X11/Xutil.h>
 #include <blocks.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -48,22 +49,29 @@ typedef struct {
 } Bar;
 
 XftColor *get_cached_color(char *);
+int parseboxstring(const char *, char [24]);
 void createctx();
 void createbar();
+void clearbar();
 void xsetup();
 void xsetatoms();
 void xcleanup();
 void xrenderblks(Block **, int, RenderInfo **);
+void handle_buttonpress(XButtonEvent *);
+void freeinfos(RenderInfo **);
+void render();
+void *handle_stdin();
+void handle_wmname(const char *);
 
-static Context *ctx;
-static Bar *bar;
-static Display *dpy;
-static int scr;
-static Window root;
+Context *ctx;
+Bar *bar;
+Display *dpy;
+int scr;
+Window root;
 
-static Block *BLKS[2][BLOCKS_SIZE];
-static RenderInfo *INFOS[2][BLOCKS_SIZE];
-static int NBLKS[2];
+Block *BLKS[2][BLOCKS_SIZE];
+RenderInfo *INFOS[2][BLOCKS_SIZE];
+int NBLKS[2];
 
 XftColor *get_cached_color(char *colorname) {
   ColorCache *cache = ctx->colorcache;
@@ -275,9 +283,6 @@ void handle_buttonpress(XButtonEvent *btn) {
       break;
     }
   }
-  // @TODO: indentify and fix this problem.
-  // *problem: stdin starts blocking in some cases, after calling 'system' func.
-  fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK);
 }
 
 void freeinfos(RenderInfo **infos) {
@@ -289,36 +294,52 @@ void freeinfos(RenderInfo **infos) {
   }
 }
 
-void handle_stdin(char *stdinbuf, size_t nbuf) {
-  for (int i = 0; i < nbuf; ++i) {
-    if (stdinbuf[i] == '\n') {
-      stdinbuf[i] = 0;
-      break;
-    }
-  }
-
-  freeblks(BLKS[0], BLOCKS_SIZE);
-  NBLKS[0] = createblks(stdinbuf, BLKS[0]);
-
-  int renderx = 0;
-  XGlyphInfo extent;
-  freeinfos(INFOS[0]);
-  for (int i = 0; i < NBLKS[0]; ++i) {
-    Block *blk = BLKS[0][i];
-    int fnindex = blk->attrs[Fn] ? atoi(blk->attrs[Fn]->val) : 0;
-    XftTextExtentsUtf8(dpy, ctx->fonts[fnindex], (FcChar8 *)blk->text,
-                       blk->ntext, &extent);
-
-    INFOS[0][i] = (RenderInfo *)malloc(sizeof(RenderInfo));
-    INFOS[0][i]->width = extent.xOff;
-    INFOS[0][i]->x = renderx + extent.x;
-    renderx += INFOS[0][i]->width;
-  }
-
-  memset(stdinbuf, 0, STDIN_BUF_SIZE);
+void render() {
+  XLockDisplay(dpy);
+  clearbar();
+  xrenderblks(BLKS[0], NBLKS[0], INFOS[0]);
+  xrenderblks(BLKS[1], NBLKS[1], INFOS[1]);
+  XUnlockDisplay(dpy);
 }
 
-void handle_wmname(char *wmname) {
+void *handle_stdin() {
+  size_t alloc = STDIN_BUF_SIZE, nbuf;
+  char *stdinbuf = malloc(alloc * sizeof(char));
+  char previous[STDIN_BUF_SIZE];
+  memset(stdinbuf, 0, STDIN_BUF_SIZE);
+  memset(previous, 0, STDIN_BUF_SIZE);
+
+  while ((nbuf = getline(&stdinbuf, &alloc, stdin)) > 1) {
+    stdinbuf[nbuf - 1] = 0;
+    if (strcmp(previous, stdinbuf) == 0)
+      continue;
+    else
+      strcpy(previous, stdinbuf);
+
+    freeblks(BLKS[0], BLOCKS_SIZE);
+    NBLKS[0] = createblks(stdinbuf, BLKS[0]);
+    memset(stdinbuf, 0, STDIN_BUF_SIZE);
+
+    int renderx = 0;
+    XGlyphInfo extent;
+    freeinfos(INFOS[0]);
+    for (int i = 0; i < NBLKS[0]; ++i) {
+      Block *blk = BLKS[0][i];
+      int fnindex = blk->attrs[Fn] ? atoi(blk->attrs[Fn]->val) : 0;
+      XftTextExtentsUtf8(dpy, ctx->fonts[fnindex], (FcChar8 *)blk->text,
+                         blk->ntext, &extent);
+
+      INFOS[0][i] = (RenderInfo *)malloc(sizeof(RenderInfo));
+      INFOS[0][i]->width = extent.xOff;
+      INFOS[0][i]->x = renderx + extent.x;
+      renderx += INFOS[0][i]->width;
+    }
+    render();
+  }
+  pthread_exit(0);
+}
+
+void handle_wmname(const char *wmname) {
   freeblks(BLKS[1], BLOCKS_SIZE);
   NBLKS[1] = createblks(wmname, BLKS[1]);
 
@@ -339,12 +360,12 @@ void handle_wmname(char *wmname) {
 }
 
 int main(void) {
-  signal(SIGINT, xcleanup);
-  signal(SIGHUP, xcleanup);
-  signal(SIGTERM, xcleanup);
-
+  XInitThreads();
   XEvent e;
   char *wmname;
+  pthread_t thread_stdin_handler;
+  struct timespec ts = {.tv_nsec = 1e6 * 25};
+
   for (int i = 0; i < 2; ++i) {
     for (int j = 0; j < BLOCKS_SIZE; ++j) {
       BLKS[i][j] = NULL;
@@ -353,41 +374,28 @@ int main(void) {
     NBLKS[i] = 0;
   }
 
-  size_t nbuf;
-  char stdinbuf[STDIN_BUF_SIZE];
-  struct timespec ts = {.tv_nsec = 1e6 * 25};
-  int renderflag = 0;
-
-  memset(stdinbuf, 0, STDIN_BUF_SIZE);
-  fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK);
-
   xsetup();
+  signal(SIGINT, xcleanup);
+  signal(SIGHUP, xcleanup);
+  signal(SIGTERM, xcleanup);
+
   while (1) {
     nanosleep(&ts, &ts);
-    renderflag = 0;
 
     if (XPending(dpy)) {
       XNextEvent(dpy, &e);
+      if (e.type == Expose)
+        pthread_create(&thread_stdin_handler, NULL, handle_stdin, NULL);
       if (e.type == ButtonPress)
         handle_buttonpress(&e.xbutton);
       if (e.xproperty.window == root && XFetchName(dpy, root, &wmname) >= 0) {
         handle_wmname(wmname);
-        renderflag = 1;
+        render();
       }
-    }
-
-    if ((nbuf = read(STDIN_FILENO, &stdinbuf, STDIN_BUF_SIZE)) != -1) {
-      handle_stdin(stdinbuf, nbuf);
-      renderflag = 1;
-    }
-
-    if (renderflag) {
-      clearbar();
-      xrenderblks(BLKS[0], NBLKS[0], INFOS[0]);
-      xrenderblks(BLKS[1], NBLKS[1], INFOS[1]);
     }
   }
 
+  pthread_join(thread_stdin_handler, NULL);
   xcleanup();
   return 0;
 }
