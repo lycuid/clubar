@@ -97,20 +97,16 @@ int parsetag(const char *text, Tag *tag, Extension *ext, char *val,
   return ptr + nend - 1;
 }
 
-Block *createblk(Attribute **attrs, const char *text, int ntext) {
-  Block *blk = (Block *)malloc(sizeof(Block));
-  blk->text = (char *)malloc(ntext * strlen(text));
-  strcpy(blk->text, text);
-  blk->ntext = ntext;
-  blk->attrs = (Attribute **)malloc(NullTag * sizeof(Attribute *));
+void createblk(Block *blk, Attribute *attrs[NullTag], const char *text,
+               int ntext) {
+  memset(blk->text, 0, 64);
+  memcpy(blk->text, text, ntext);
 
   for (int i = 0; i < NullTag; ++i)
     blk->attrs[i] = mkcopy(attrs[i]);
-
-  return blk;
 }
 
-int createblks(const char *name, Block **blks) {
+int createblks(const char *name, Block *blks) {
   int len = strlen(name), nblks = 0, nbuf = 0, ptr, stateupdated, tagclose;
   char buf[len], val[len];
   Tag tag;
@@ -141,7 +137,7 @@ int createblks(const char *name, Block **blks) {
 
     if (stateupdated) {
       if (nbuf)
-        blks[nblks++] = createblk(attrstate[Cur], buf, nbuf);
+        createblk(&blks[nblks++], attrstate[Cur], buf, nbuf);
 
       if (tag != NullTag) {
         LOOP(attrstate[Cur][tag] = pop(attrstate[Cur][tag]));
@@ -155,7 +151,7 @@ int createblks(const char *name, Block **blks) {
   }
 
   if (nbuf)
-    blks[nblks++] = createblk(attrstate[Cur], buf, nbuf);
+    createblk(&blks[nblks++], attrstate[Cur], buf, nbuf);
 
   for (int i = 0; i < NullTag; ++i) {
     LOOP(attrstate[Cur][i] = pop(attrstate[Cur][i]));
@@ -165,16 +161,10 @@ int createblks(const char *name, Block **blks) {
   return nblks;
 }
 
-void freeblks(Block **blks, int nblks) {
-  for (int b = 0; b < nblks && blks[b] != NULL; ++b) {
-    Block *blk = blks[b];
-
+void freeblks(Block *blks, int nblks) {
+  for (int b = 0; b < nblks; ++b) {
+    Block *blk = &blks[b];
     for (int i = 0; i < NullTag; ++i)
       LOOP(blk->attrs[i] = pop(blk->attrs[i]));
-
-    free(blk->text);
-    free(blk->attrs);
-    free(blks[b]);
-    blks[b] = NULL;
   }
 }
