@@ -1,40 +1,48 @@
 XD Bar
 -------
-A minialistic statusbar for X11 Desktops, compatible with EWMH standards.
-Inspired by 'X'mobar and 'D'wm statusbar, written in 'C'.
+A minialistic statusbar, inspired by 'X'mobar and 'D'wm statusbar, for X11
+Desktops that are compatible with EWMH standards.
 
-Why C? performance.
-If so, why not Rust? No official X11 lib, writing FFI for X11 was delightfully
-painful.
-Future Goals: Rewrite in Rust. :pepehands:
+Rendering styled/clickable text, is inspired by xmobar's approach of having
+tags in the string (https://xmobar.org/).
+Populating statusbar is inspired by dwm statusbar's approach of using the root
+window's 'WM_NAME' attribute text (https://dwm.suckless.org/).
 
-Build and install:
-------------------
-  make && sudo make install
+Why use C? performance and X11 lib support.
+Future Goals: Maybe rewrite in Rust. :pepehands:
 
 Build Requirements:
--------------------
+-------------
   - GNU Make
   - libx11
   - libxft
   - fontconfig
 
-How it renders:
----------------
+Build and install:
+------------------
+  make && sudo make install
 
-  ------------------------------------------------------------------------------
-  |stdin                                                                WM_NAME|
+How bar window renders:
+-----------------------
+
+  ------------------------------------margin------------------------------------
+  | --------------------------------bar-window-------------------------------- |
+  | | --------------------------------padding------------------------------- | |
+  | | |stdin                                                        WM_NAME| | |
+  | | ---------------------------------------------------------------------- | |
+  | -------------------------------------------------------------------------- |
   ------------------------------------------------------------------------------
 
-  'stdin' text is typically provided by the window manager
-  'WM_NAME' (of the root window) can be set using the 'xsetroot' command.
+  - 'margin' is the empty space outside of the bar window.
+  - 'padding' is the space between the bar window edges and the drawing region.
+  - 'stdin' text is typically provided by the window manager
+  - 'WM_NAME' (of the root window) can be set using the 'xsetroot' command.
 
 Setting 'WM_NAME':
 ------------------
   - slstatus <https://tools.suckless.org/slstatus>
-  - xdstatus <https://github.com/lycuid/xdstatus> (much faster and overall better
-    than slstatus...coz. Rust. I guess?).
-
+  - smolprog <https://github.com/lycuid/smolprog> (much faster and overall just
+        better than slstatus...coz. Rust. I guess?).
   - Custom script example (using bash):
 
     #!/bin/bash
@@ -46,36 +54,46 @@ Setting 'WM_NAME':
 Styling text:
 -------------
   Template for styling text:
-    <Tag:Extension=Val> Text </Tag>
+    <Tag:Extension=Value> Text </Tag>
 
   Valid Tags:
     Fn, Fg, Bg, Box, BtnL, BtnM, BtnR, ScrlU, ScrlD
 
-  Valid Extensions:
+  Valid Extensions (Optional):
     Shift, Ctrl, Super, Alt, Left, Right, Top, Bottom
 
-  Valid Extensions for Tag:
-    Fn:     -
-    Fg:     -
-    Bg:     -
-    Box:    Left, Right, Top, Bottom
-    BtnL:   Shift, Ctrl, Super, Alt
-    BtnM:   Shift, Ctrl, Super, Alt
-    BtnR:   Shift, Ctrl, Super, Alt
-    ScrlU:  Shift, Ctrl, Super, Alt
-    ScrlD:  Shift, Ctrl, Super, Alt
+  Valid Extensions for Tags:
+    ---------------------------------------
+    | Tag     | Extensions                |
+    ---------------------------------------
+    | Fn      | -                         |
+    | Fg      | -                         |
+    | Bg      | -                         |
+    | Box     | Left, Right, Top, Bottom  |
+    | BtnL    | Shift, Ctrl, Super, Alt   |
+    | BtnM    | Shift, Ctrl, Super, Alt   |
+    | BtnR    | Shift, Ctrl, Super, Alt   |
+    | ScrlU   | Shift, Ctrl, Super, Alt   |
+    | ScrlD   | Shift, Ctrl, Super, Alt   |
+    ---------------------------------------
 
   Valid values for Tags:
-    Fn:     Number                (index of 'fonts' defined in 'config.h'
-                                    starting from 1.)
-    Fg:     ColorName             (eg. black, #000000)
-    Bg:     ColorName             (eg. black, #000000)
-    Box:    ColorName:pixelsize   (eg. yellow:1, #cccccc:2)
-    BtnL:   Command               (eg. systemctl poweroff)
-    BtnM:   Command               (eg. systemctl poweroff)
-    BtnR:   Command               (eg. systemctl poweroff)
-    ScrlU:  Command               (eg. systemctl poweroff)
-    ScrlD:  Command               (eg. systemctl poweroff)
+    <Fn=Number>
+      'Number': index of 'fonts' array in 'config.h'.
+      'fonts[0]' will be used as default font.
+
+    <Fg=Color> <Bg=Color>
+      'Color': any valid color name.
+      - eg. <Fg=black> </Fg>  <Bg=#000000> </Bg>
+
+    <Box=Color> <Box=Color:Size>
+      'Color' any valid color name.
+      'Size' size in pixels (if not provided, defaults to 1).
+      - eg. <Box=yellow:2> </Box>  <Box=#dfdfdf> </Box>
+
+    <BtnL=Command> <BtnM=Command> <BtnR=Command> <ScrlU=Command> <ScrlD=Command>
+      'Command' any string. command output/error will not be handled.
+      - eg. <BtnL=systemctl poweroff> </BtnL>  <BtnR=systemctl reboot> </BtnR>
 
 Example text:
 -------------
@@ -84,7 +102,8 @@ Example text:
   - <Box:Bottom=#ffffff:1> underlined </Bottom> text.
 
   - <BtnL=systemctl reboot> reboot </BtnL>
+  - <BtnL:Shift=sudo -A reboot now> reboot w/ confirmation </BtnL>
 
-  - <ScrlU:Shift=amixer sset Master 5%+><ScrlD:Shift=amixer sset Master 5%->
+  - <ScrlU:Ctrl=amixer sset Master 5%+><ScrlD:Ctrl=amixer sset Master 5%->
       volume
     </ScrlD></ScrlU>
