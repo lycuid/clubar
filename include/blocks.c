@@ -5,6 +5,8 @@
 
 #define LOOP(cond) while ((cond))
 
+enum { Cur, New } State;
+
 void allowed_tag_extensions(Tag tag, Extension extensions[NullExt]) {
   // Always end with 'NullExt'.
   switch (tag) {
@@ -23,6 +25,7 @@ void allowed_tag_extensions(Tag tag, Extension extensions[NullExt]) {
     break;
   }
   default:
+    *extensions = NullExt;
     break;
   }
 }
@@ -74,14 +77,16 @@ int parsetag(const char *text, Tag *tag, Extension *ext, char *val,
     return 0;
 
   if (!*closing) {
-    Extension extensions[NullExt] = {NullExt};
-    allowed_tag_extensions(*tag, extensions);
-    for (int e = 0; extensions[e] != NullExt; ++e) {
-      const char *ext_repr = ExtRepr[extensions[e]];
-      if (memcmp(text + ptr, ext_repr, strlen(ext_repr)) == 0) {
-        ptr += strlen(ext_repr);
-        *ext = extensions[e];
-        break;
+    if (text[ptr] == ':' && ptr++) {
+      Extension extensions[NullExt] = {NullExt};
+      allowed_tag_extensions(*tag, extensions);
+      for (int e = 0; extensions[e] != NullExt; ++e) {
+        const char *ext_repr = ExtRepr[extensions[e]];
+        if (memcmp(text + ptr, ext_repr, strlen(ext_repr)) == 0) {
+          ptr += strlen(ext_repr);
+          *ext = extensions[e];
+          break;
+        }
       }
     }
 

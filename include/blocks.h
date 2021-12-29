@@ -1,6 +1,8 @@
 typedef enum { Fn, Fg, Bg, Box, BtnL, BtnM, BtnR, ScrlU, ScrlD, NullTag } Tag;
 static const char *const TagRepr[NullTag] = {
-    "Fn", "Fg", "Bg", "Box", "BtnL", "BtnM", "BtnR", "ScrlU", "ScrlD"};
+    [Fn] = "Fn",     [Fg] = "Fg",       [Bg] = "Bg",
+    [Box] = "Box",   [BtnL] = "BtnL",   [BtnM] = "BtnM",
+    [BtnR] = "BtnR", [ScrlU] = "ScrlU", [ScrlD] = "ScrlD"};
 
 typedef enum {
   Shift,
@@ -14,9 +16,9 @@ typedef enum {
   NullExt
 } Extension;
 static const char *const ExtRepr[NullExt] = {
-    ":Shift", ":Ctrl", ":Super", ":Alt", ":Left", ":Right", ":Top", ":Bottom"};
-
-typedef enum { Cur, New } State;
+    [Shift] = "Shift", [Ctrl] = "Ctrl",    [Super] = "Super",
+    [Alt] = "Alt",     [Left] = "Left",    [Right] = "Right",
+    [Top] = "Top",     [Bottom] = "Bottom"};
 
 typedef struct _Attribute {
   char val[64];

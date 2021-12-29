@@ -4,13 +4,11 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <blocks.h>
-#include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <time.h>
-#include <unistd.h>
 
 #define eprintf(...) fprintf(stderr, __VA_ARGS__);
 #define die(...)                                                               \
@@ -28,14 +26,10 @@ typedef struct {
 } RenderInfo;
 
 typedef struct _ColorCache {
-  char *name;
+  char name[32];
   XftColor val;
   struct _ColorCache *previous;
 } ColorCache;
-
-typedef struct {
-  unsigned int x, y, w, h;
-} Geometry;
 
 typedef struct {
   int nfonts;
@@ -63,7 +57,7 @@ void xcleanup();
 void xrenderblks(Block[MAX_BLKS], int, RenderInfo[MAX_BLKS]);
 void handle_buttonpress(XButtonEvent *);
 void render();
-void *handle_stdin();
+void *spawn_stdin_listener();
 void handle_wmname(const char *);
 
 Context ctx;
@@ -87,10 +81,9 @@ XftColor *get_cached_color(const char *colorname) {
   // @TODO: currently not handling error when allocating colors.
   ColorCache *color = (ColorCache *)malloc(sizeof(ColorCache));
   XftColorAllocName(dpy, ctx.vis, ctx.cmap, colorname, &color->val);
-  color->name = malloc(strlen(colorname));
+
   strcpy(color->name, colorname);
   color->previous = ctx.colorcache;
-
   ctx.colorcache = color;
 
   return &ctx.colorcache->val;
@@ -127,7 +120,8 @@ void createctx() {
 }
 
 void createbar() {
-  bar.window_g = (Geometry){barConfig.x, barConfig.y, barConfig.w, barConfig.h};
+  Geometry geometry = barConfig.geometry;
+  bar.window_g = (Geometry){geometry.x, geometry.y, geometry.w, geometry.h};
 
   bar.canvas_g.x = barConfig.padding.left;
   bar.canvas_g.y = barConfig.padding.top;
@@ -313,7 +307,7 @@ void render() {
   XUnlockDisplay(dpy);
 }
 
-void *handle_stdin() {
+void *spawn_stdin_listener() {
   size_t alloc = STDIN_BUF_SIZE, nbuf;
   char *stdinbuf = malloc(alloc);
   char previous[STDIN_BUF_SIZE];
@@ -370,7 +364,7 @@ int main(void) {
   XInitThreads();
   XEvent e;
   char *wmname;
-  pthread_t thread_stdin_handler;
+  pthread_t thread_handle;
   struct timespec ts = {.tv_nsec = 1e6 * 25};
 
   for (int i = 0; i < 2; ++i) {
@@ -393,7 +387,7 @@ int main(void) {
     if (XPending(dpy)) {
       XNextEvent(dpy, &e);
       if (e.type == Expose)
-        pthread_create(&thread_stdin_handler, NULL, handle_stdin, NULL);
+        pthread_create(&thread_handle, NULL, spawn_stdin_listener, NULL);
       if (e.type == ButtonPress)
         handle_buttonpress(&e.xbutton);
       if (e.xproperty.window == rootwindow &&
@@ -408,7 +402,7 @@ int main(void) {
     }
   }
 
-  pthread_join(thread_stdin_handler, NULL);
+  pthread_join(thread_handle, NULL);
   xcleanup();
   return 0;
 }

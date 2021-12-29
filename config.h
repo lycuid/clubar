@@ -6,21 +6,22 @@
 #define TAG_START "<"
 #define TAG_END ">"
 
-struct BarConfig {
+typedef struct {
   unsigned int x, y, w, h;
+} Geometry;
+
+struct BarConfig {
   bool topbar;
+  Geometry geometry;
   struct {
     unsigned int left, right, top, bottom;
   } padding, margin;
   char *foreground, *background;
 };
 
-static const struct BarConfig barConfig = {.x = 0,
-                                           .y = 768 - 32,
-                                           .w = 1366,
-                                           .h = 32,
-                                           .topbar = false,
+static const struct BarConfig barConfig = {.geometry = {0, 768 - 32, 1366, 32},
                                            .padding = {0, 0, 0, 0},
+                                           .topbar = false,
                                            .margin = {0, 0, 0, 0},
                                            .foreground = "#efefef",
                                            .background = "#090909"};
