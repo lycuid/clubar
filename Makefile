@@ -1,44 +1,35 @@
 NAME=xdbar
 BUILDDIR=bin
 DEBUGDIR=debug
-
 BIN=$(BUILDDIR)/$(NAME)
+DEBUGBIN=$(DEBUGDIR)/$(NAME)
+
 PREFIX=/usr/local
 BINPREFIX=$(PREFIX)/bin
 
-INC=-I/usr/include/freetype2 -Iinclude
-LDFLAGS=-lX11 -lpthread -lfontconfig -lXft
-CFLAGS=-Wall -pedantic -O3
+CFLAGS=-Wall -Wextra -pedantic -O3
+LDFLAGS=-lpthread -lX11 -lfontconfig -lXft
+INC=-I/usr/include/freetype2
 
-build: clean include.o
+build: blocks.o x.o
 	mkdir -p $(BUILDDIR)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(INC) -o $(BIN) $(NAME).c *.o
 
 options:
-	@echo xdbar build options:
+	@echo "$(NAME) build options:"
+	@echo "CC       = $(CC)"
 	@echo "CFLAGS   = $(CFLAGS)"
 	@echo "LDFLAGS  = $(LDFLAGS)"
 	@echo "INC      = $(INC)"
-	@echo "CC       = $(CC)"
 
-include.o:
-	$(CC) $(CFLAGS) -c include/*.c
+blocks.o: include/blocks.c include/blocks.h
+	$(CC) $(CFLAGS) $(INC) -c include/blocks.c
 
-.PHONY: dbg
-dbg:
-	mkdir -p $(DEBUGDIR)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(INC) -ggdb -o $(DEBUGDIR)/$(NAME) $(NAME).c include/*.c
-
-.PHONY: debug
-debug: dbg
-	gdb $(DEBUGDIR)/$(NAME)
+x.o: include/x.c include/x.h
+	$(CC) $(CFLAGS) $(LDFLAGS) $(INC) -c include/x.c
 
 run: build
 	$(BIN)
-
-.PHONY: clean
-clean:
-	rm -rf $(BUILDDIR) $(DEBUGDIR) *.o
 
 install: options $(BIN)
 	mkdir -p $(DESTDIR)$(BINPREFIX)
@@ -48,3 +39,16 @@ install: options $(BIN)
 
 uninstall:
 	rm $(DESTDIR)$(BINPREFIX)/$(NAME)
+
+.PHONY: clean
+clean:
+	rm -rf $(BUILDDIR) $(DEBUGDIR) *.o
+
+.PHONY: dbg
+dbg:
+	mkdir -p $(DEBUGDIR)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(INC) -g -o $(DEBUGBIN) $(NAME).c include/*.c
+
+.PHONY: debug
+debug: dbg
+	gdb $(DEBUGDIR)/$(NAME)

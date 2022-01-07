@@ -4,31 +4,7 @@
 #include <string.h>
 
 #define LOOP(cond) while ((cond))
-
-enum { Cur, New } State;
-
-void allowed_tag_extensions(Tag tag, Extension extensions[NullExt]) {
-  // Always end with 'NullExt'.
-  switch (tag) {
-  case Box: {
-    Extension temp[5] = {Left, Right, Top, Bottom, NullExt};
-    memcpy(extensions, temp, sizeof(temp));
-    break;
-  }
-  case BtnL:
-  case BtnM:
-  case BtnR:
-  case ScrlU:
-  case ScrlD: {
-    Extension temp[5] = {Shift, Ctrl, Super, Alt, NullExt};
-    memcpy(extensions, temp, sizeof(temp));
-    break;
-  }
-  default:
-    *extensions = NullExt;
-    break;
-  }
-}
+enum { Cur, New };
 
 Attribute *mkcopy(Attribute *root) {
   if (root == NULL)
@@ -41,11 +17,11 @@ Attribute *mkcopy(Attribute *root) {
 }
 
 Attribute *push(const char *val, Extension extension, Attribute *previous) {
-  Attribute *attribute = (Attribute *)malloc(sizeof(Attribute));
-  strcpy(attribute->val, val);
-  attribute->extension = extension;
-  attribute->previous = previous;
-  return attribute;
+  Attribute *attr = (Attribute *)malloc(sizeof(Attribute));
+  strcpy(attr->val, val);
+  attr->extension = extension;
+  attr->previous = previous;
+  return attr;
 }
 
 Attribute *pop(Attribute *stale) {
@@ -78,8 +54,7 @@ int parsetag(const char *text, Tag *tag, Extension *ext, char *val,
 
   if (!*closing) {
     if (text[ptr] == ':' && ptr++) {
-      Extension extensions[NullExt] = {NullExt};
-      allowed_tag_extensions(*tag, extensions);
+      const Extension *extensions = AllowedTagExtensions[*tag];
       for (int e = 0; extensions[e] != NullExt; ++e) {
         const char *ext_repr = ExtRepr[extensions[e]];
         if (memcmp(text + ptr, ext_repr, strlen(ext_repr)) == 0) {
@@ -104,54 +79,50 @@ int parsetag(const char *text, Tag *tag, Extension *ext, char *val,
 
 void createblk(Block *blk, Attribute *attrs[NullTag], const char *text,
                int ntext) {
-  memset(blk->text, 0, 64);
   memcpy(blk->text, text, ntext);
+  blk->text[ntext] = 0;
 
   for (int i = 0; i < NullTag; ++i)
     blk->attrs[i] = mkcopy(attrs[i]);
 }
 
 int createblks(const char *name, Block *blks) {
-  int len = strlen(name), nblks = 0, nbuf = 0, ptr, stateupdated, tagclose;
+  int len = strlen(name), nblks = 0, nbuf = 0, ptr, tagclose;
   char buf[len], val[len];
   Tag tag;
   Extension ext;
 
   Attribute *attrstate[2][NullTag];
-  for (Tag tag = 0; tag < NullTag; ++tag) {
-    attrstate[Cur][tag] = NULL;
-    attrstate[New][tag] = NULL;
-  }
+  for (Tag tag = 0; tag < NullTag; ++tag)
+    attrstate[Cur][tag] = attrstate[New][tag] = NULL;
 
   for (ptr = 0; ptr < len; ++ptr) {
-    tag = NullTag, stateupdated = 0;
-
     if (name[ptr] == TAG_START[0]) {
-      ext = NullExt, tagclose = 0;
+      tag = NullTag, ext = NullExt, tagclose = 0;
       memset(val, 0, sizeof(val));
       int size = parsetag(name + ptr, &tag, &ext, val, &tagclose);
-      if (size > 0 && tag != NullTag) {
-        // On tag parse success, the only time state is not updated is when tag
-        // is closed, with no corresponding opening tag.
-        stateupdated = !(tagclose && attrstate[New][tag] == NULL);
-        ptr += stateupdated ? size : 0;
+      // check for 'out of place' closing tag (closing tag without
+      // corresponding opening tag).
+      int oop = tagclose && attrstate[New][tag] == NULL;
+      // tag parse success check.
+      if (size > 0 && tag != NullTag && !oop) {
         attrstate[New][tag] = tagclose ? pop(attrstate[New][tag])
                                        : push(val, ext, attrstate[New][tag]);
-      }
-    }
+        // only creating a new block, if text is not empty as blocks with
+        // empty text doesn't get rendered and that block becomes essentially
+        // useless (very tiny memory/speed optimization).
+        if (nbuf)
+          createblk(&blks[nblks++], attrstate[Cur], buf, nbuf);
 
-    if (stateupdated) {
-      if (nbuf)
-        createblk(&blks[nblks++], attrstate[Cur], buf, nbuf);
-
-      if (tag != NullTag) {
+        ptr += size;
+        // State Update: copy 'New' attrstate to 'Cur' attrstate.
         LOOP(attrstate[Cur][tag] = pop(attrstate[Cur][tag]));
         attrstate[Cur][tag] = mkcopy(attrstate[New][tag]);
+        // reset temp value buffer and continue loop, once state is updated.
+        memset(buf, nbuf = 0, sizeof(buf));
+        continue;
       }
-      memset(buf, nbuf = 0, sizeof(buf));
-      continue;
     }
-
     buf[nbuf++] = name[ptr];
   }
 

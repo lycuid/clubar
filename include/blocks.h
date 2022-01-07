@@ -1,3 +1,6 @@
+#ifndef __BLOCKS_H__
+#define __BLOCKS_H__
+
 typedef enum { Fn, Fg, Bg, Box, BtnL, BtnM, BtnR, ScrlU, ScrlD, NullTag } Tag;
 static const char *const TagRepr[NullTag] = {
     [Fn] = "Fn",     [Fg] = "Fg",       [Bg] = "Bg",
@@ -20,6 +23,17 @@ static const char *const ExtRepr[NullExt] = {
     [Alt] = "Alt",     [Left] = "Left",    [Right] = "Right",
     [Top] = "Top",     [Bottom] = "Bottom"};
 
+static const Extension AllowedTagExtensions[NullTag][NullExt] = {
+    [Fn] = {NullExt},
+    [Fg] = {NullExt},
+    [Bg] = {NullExt},
+    [Box] = {Left, Right, Top, Bottom, NullExt},
+    [BtnL] = {Shift, Ctrl, Super, Alt, NullExt},
+    [BtnM] = {Shift, Ctrl, Super, Alt, NullExt},
+    [BtnR] = {Shift, Ctrl, Super, Alt, NullExt},
+    [ScrlU] = {Shift, Ctrl, Super, Alt, NullExt},
+    [ScrlD] = {Shift, Ctrl, Super, Alt, NullExt}};
+
 typedef struct _Attribute {
   char val[64];
   Extension extension;
@@ -27,11 +41,10 @@ typedef struct _Attribute {
 } Attribute;
 
 typedef struct {
-  char *text;
+  char text[64];
   Attribute *attrs[NullTag];
 } Block;
 
-void allowed_tag_extensions(Tag, Extension[NullExt]);
 Attribute *mkcopy(Attribute *);
 Attribute *push(const char *, Extension, Attribute *);
 Attribute *pop(Attribute *);
@@ -41,3 +54,5 @@ void createblk(Block *, Attribute *[NullTag], const char *, int);
 // public.
 void freeblks(Block *, int);
 int createblks(const char *, Block *);
+
+#endif
