@@ -1,6 +1,9 @@
 #ifndef __BLOCKS_H__
 #define __BLOCKS_H__
 
+#define TAG_START "<"
+#define TAG_END ">"
+
 typedef enum { Fn, Fg, Bg, Box, BtnL, BtnM, BtnR, ScrlU, ScrlD, NullTag } Tag;
 static const char *const TagRepr[NullTag] = {
     [Fn] = "Fn",     [Fg] = "Fg",       [Bg] = "Bg",

@@ -1,7 +1,7 @@
-#include "../config.h"
 #include "blocks.h"
+#include "utils.h"
 
-void xsetup();
+void xsetup(const Config *const);
 void renderblks(BlockType, Block[2][MAX_BLKS], int[2]);
 int handle_xevent(Block[2][MAX_BLKS], int[2], char *, int *);
 void xcleanup();

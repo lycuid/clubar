@@ -88,37 +88,37 @@ int parseboxstring(const char *val, char color[32]) {
   return size > 0 ? size : 1;
 }
 
-void createctx() {
+void createctx(const Config *const config) {
   ctx.vis = DefaultVisual(dpy, scr);
   ctx.cmap = DefaultColormap(dpy, scr);
 
-  ctx.nfonts = sizeof(fonts) / sizeof *fonts;
+  ctx.nfonts = config->nfonts;
 
   ctx.fonts = (XftFont **)malloc(ctx.nfonts * sizeof(XftFont *));
   for (int i = 0; i < ctx.nfonts; ++i)
-    ctx.fonts[i] = XftFontOpenName(dpy, scr, fonts[i]);
+    ctx.fonts[i] = XftFontOpenName(dpy, scr, config->fonts[i]);
 
   ctx.colorcache = NULL;
 }
 
-void createbar() {
-  Geometry geometry = barConfig.geometry;
+void createbar(const BarConfig *const barConfig) {
+  Geometry geometry = barConfig->geometry;
   bar.window_g = (Geometry){geometry.x, geometry.y, geometry.w, geometry.h};
 
-  bar.canvas_g.x = barConfig.padding.left;
-  bar.canvas_g.y = barConfig.padding.top;
+  bar.canvas_g.x = barConfig->padding.left;
+  bar.canvas_g.y = barConfig->padding.top;
   bar.canvas_g.w =
-      bar.window_g.w - barConfig.padding.left - barConfig.padding.right;
+      bar.window_g.w - barConfig->padding.left - barConfig->padding.right;
   bar.canvas_g.h =
-      bar.window_g.h - barConfig.padding.top - barConfig.padding.bottom;
+      bar.window_g.h - barConfig->padding.top - barConfig->padding.bottom;
 
   bar.xwindow = XCreateSimpleWindow(dpy, root, bar.window_g.x, bar.window_g.y,
                                     bar.window_g.w, bar.window_g.h, 0,
                                     WhitePixel(dpy, scr), BlackPixel(dpy, scr));
 
-  XftColorAllocName(dpy, ctx.vis, ctx.cmap, barConfig.foreground,
+  XftColorAllocName(dpy, ctx.vis, ctx.cmap, barConfig->foreground,
                     &bar.foreground);
-  XftColorAllocName(dpy, ctx.vis, ctx.cmap, barConfig.background,
+  XftColorAllocName(dpy, ctx.vis, ctx.cmap, barConfig->background,
                     &bar.background);
 
   bar.canvas = XftDrawCreate(dpy, bar.xwindow, ctx.vis, ctx.cmap);
@@ -129,27 +129,27 @@ void clearbar() {
               bar.window_g.h);
 }
 
-void xsetup() {
+void xsetup(const Config *const config) {
   XInitThreads();
   if ((dpy = XOpenDisplay(NULL)) == NULL)
     die("Cannot open display.\n");
   root = DefaultRootWindow(dpy);
   scr = DefaultScreen(dpy);
 
-  createctx();
-  createbar();
+  createctx(config);
+  createbar(&config->barConfig);
 
   XSelectInput(dpy, root, PropertyChangeMask);
   XSelectInput(dpy, bar.xwindow, ExposureMask | ButtonPressMask);
-  xsetatoms();
+  xsetatoms(&config->barConfig);
   XMapWindow(dpy, bar.xwindow);
 }
 
-void xsetatoms() {
+void xsetatoms(const BarConfig *const barConfig) {
   long barheight =
-      bar.window_g.h + barConfig.margin.top + barConfig.margin.bottom;
-  long top = barConfig.topbar ? barheight : 0;
-  long bottom = !barConfig.topbar ? barheight : 0;
+      bar.window_g.h + barConfig->margin.top + barConfig->margin.bottom;
+  long top = barConfig->topbar ? barheight : 0;
+  long bottom = !barConfig->topbar ? barheight : 0;
   /* left, right, top, bottom, left_start_y, left_end_y, right_start_y,
    * right_end_y, top_start_x, top_end_x, bottom_start_x, bottom_end_x */
   long strut[12] = {0, 0, top, bottom, 0, 0, 0, 0, 0, 0, 0, 0};

@@ -28,7 +28,7 @@ options:
 	@echo "LDFLAGS  = $(LDFLAGS)"
 	@echo "INC      = $(INC)"
 
-run: build
+run: $(BIN)
 	$(BIN)
 
 install: options $(BIN)

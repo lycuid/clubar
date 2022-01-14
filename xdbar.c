@@ -11,7 +11,8 @@
 #define BLOCK_BUF_SIZE (1 << 10)
 
 void *stdin_handler();
-void setup();
+Config create_config();
+void setup(Config *);
 void gracefully_exit();
 
 static Block Blks[2][MAX_BLKS];
@@ -43,12 +44,20 @@ void *stdin_handler() {
   pthread_exit(0);
 }
 
-void setup() {
+Config create_config() {
+  Config config;
+  config.nfonts = sizeof(fonts) / sizeof(*fonts);
+  config.fonts = (char **)fonts;
+  config.barConfig = barConfig;
+  return config;
+}
+
+void setup(Config *config) {
   pthread_create(&thread_handle, NULL, stdin_handler, NULL);
   for (int i = 0; i < 2; ++i)
     NBlks[i] = 0;
 
-  b_Setup();
+  b_Setup(config);
   signal(SIGINT, gracefully_exit);
   signal(SIGHUP, gracefully_exit);
   signal(SIGTERM, gracefully_exit);
@@ -57,9 +66,11 @@ void setup() {
 void gracefully_exit() { EventLoopRunning = 0; }
 
 int main(void) {
-  setup();
   char customstr[BLOCK_BUF_SIZE];
   struct timespec ts = {.tv_nsec = 1e6 * 25};
+
+  Config config = create_config();
+  setup(&config);
 
   while (EventLoopRunning) {
     nanosleep(&ts, &ts);
