@@ -10,10 +10,16 @@ BINPREFIX=$(PREFIX)/bin
 CFLAGS=-Wall -Wextra -pedantic -O3
 LDFLAGS=-lpthread -lX11 -lfontconfig -lXft
 INC=-I/usr/include/freetype2
+OBJS=blocks.o x.o
 
-build: blocks.o x.o
-	mkdir -p $(BUILDDIR)
+$(BIN): $(NAME).c config.h $(OBJS) | $(BUILDDIR)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(INC) -o $(BIN) $(NAME).c *.o
+
+$(BUILDDIR):
+	mkdir -p $(BUILDDIR)
+
+%.o: include/%.c include/%.h
+	$(CC) $(LDFLAGS) $(INC) $(CFLAGS) -c $<
 
 options:
 	@echo "$(NAME) build options:"
@@ -21,12 +27,6 @@ options:
 	@echo "CFLAGS   = $(CFLAGS)"
 	@echo "LDFLAGS  = $(LDFLAGS)"
 	@echo "INC      = $(INC)"
-
-blocks.o: include/blocks.c include/blocks.h
-	$(CC) $(CFLAGS) $(INC) -c include/blocks.c
-
-x.o: include/x.c include/x.h
-	$(CC) $(CFLAGS) $(LDFLAGS) $(INC) -c include/x.c
 
 run: build
 	$(BIN)
