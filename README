@@ -12,21 +12,32 @@ Why use C? performance and X11 lib support.
 Future Goals: Maybe rewrite in Rust. :pepehands:
 
 Build Requirements:
--------------
-  - GNU Make
-  - libx11
-  - libxft
-  - fontconfig
+-------------------
+  - gnu make
+  - x11
+  - xft
+
+Optional:
+---------
+  - pkg-config  (update 'config.mk', if 'pkg-config' not installed).
+  - lua         (runtime configurations support).
 
 Build and install:
 ------------------
-  make && sudo make install
+  default build:
+    $ make
+
+  build with runtime config support (lua):
+    $ make CONFIG_TYPE=LUA
+
+  install:
+    $ sudo make install
 
 How bar window renders:
 -----------------------
 
   +-----------------------------------margin-----------------------------------+
-  | +-------------------------------bar-window-------------------------------+ |
+  | +------------------------------------------------------------------------+ |
   | | +-------------------------------padding------------------------------+ | |
   | | |stdin                                                        WM_NAME| | |
   | | +--------------------------------------------------------------------+ | |
@@ -35,7 +46,6 @@ How bar window renders:
 
   - 'margin' is the empty space outside of the bar window.
   - 'padding' is the space between the bar window edges and the drawing region.
-  - 'bar-window' is the actual window that is drawn on the screen.
   - 'stdin' text is typically provided by the window manager
   - 'WM_NAME' (of the root window) can be set using the 'xsetroot' command.
 

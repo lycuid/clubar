@@ -2,10 +2,6 @@
 #define __UTILS_H__
 
 #include <stdarg.h>
-#include <stdbool.h>
-
-#define NAME "xdbar"
-#define VERSION "0.1.0"
 
 #define MAX_BLKS (1 << 6)
 
@@ -24,12 +20,12 @@ typedef struct {
 } Geometry;
 
 typedef struct {
-  bool topbar;
+  int topbar;
   Geometry geometry;
   struct {
     unsigned int left, right, top, bottom;
   } padding, margin;
-  char *foreground, *background;
+  char foreground[16], background[16];
 } BarConfig;
 
 typedef struct {
@@ -37,5 +33,7 @@ typedef struct {
   char **fonts;
   BarConfig barConfig;
 } Config;
+
+void usage(void);
 
 #endif

@@ -1,4 +1,6 @@
 -Wall
 -Wextra
--I/usr/include/freetype2
 -pedantic
+-DNAME="xdbar"
+-DVERSION="0.1.0"
+-I/usr/include/freetype2

@@ -39,8 +39,8 @@ static int scr;
 static char *wm_name;
 static RenderInfo Infos[2][MAX_BLKS];
 
+inline int ParseBoxString(const char *, char[32]);
 XftColor *get_cached_color(const char *);
-int parseboxstring(const char *, char[32]);
 void createctx();
 void createbar();
 void clearbar();
@@ -51,6 +51,23 @@ void xrenderblks(Block[MAX_BLKS], int, RenderInfo[MAX_BLKS]);
 void preparestdinblks(Block[MAX_BLKS], int);
 void preparecustomblks(Block[MAX_BLKS], int);
 void handle_xbuttonpress(XButtonEvent *, Block[2][MAX_BLKS], int[2]);
+
+inline int ParseBoxString(const char *val, char color[32]) {
+  int ptr = 0, c = 0, nval = strlen(val), size = 0;
+  memset(color, 0, 32);
+
+  while (ptr < nval && val[ptr] != ':')
+    color[c++] = val[ptr++];
+
+  if (val[ptr++] == ':')
+    while (ptr < nval && val[ptr] >= '0' && val[ptr] <= '9')
+      size = (size * 10) + val[ptr++] - '0';
+
+  if (ptr < nval - 1)
+    die("Invalid Box template string: %s\n", val);
+
+  return size > 0 ? size : 1;
+}
 
 XftColor *get_cached_color(const char *colorname) {
   ColorCache *cache = ctx.colorcache;
@@ -69,23 +86,6 @@ XftColor *get_cached_color(const char *colorname) {
   ctx.colorcache = color;
 
   return &ctx.colorcache->val;
-}
-
-int parseboxstring(const char *val, char color[32]) {
-  int ptr = 0, c = 0, nval = strlen(val), size = 0;
-  memset(color, 0, 32);
-
-  while (ptr < nval && val[ptr] != ':')
-    color[c++] = val[ptr++];
-
-  if (val[ptr++] == ':')
-    while (ptr < nval && val[ptr] >= '0' && val[ptr] <= '9')
-      size = (size * 10) + val[ptr++] - '0';
-
-  if (ptr < nval - 1)
-    die("Invalid Box template string: %s\n", val);
-
-  return size > 0 ? size : 1;
 }
 
 void createctx(const Config *const config) {
@@ -208,7 +208,7 @@ void xrenderblks(Block blks[MAX_BLKS], int nblk, RenderInfo ris[MAX_BLKS]) {
 
     box = blk->attrs[Box];
     while (box != NULL) {
-      size = parseboxstring(box->val, color);
+      size = ParseBoxString(box->val, color);
       if (size) {
         int bx = canvas_g->x, by = canvas_g->y, bw = 0, bh = 0;
         switch (box->extension) {
