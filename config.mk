@@ -1,26 +1,29 @@
 # constants.
 NAME:=xdbar
-VERSION:=0.1.0
+MAIN:=$(NAME).c
+VERSION:=0.2.0
 BUILDDIR:=bin
 BIN:=$(BUILDDIR)/$(NAME)
+# install paths.
 PREFIX:=/usr/local
 BINPREFIX:=$(PREFIX)/bin
 
 # misc.
-CONFIG_TYPE=0
-DEFINE=-DNAME='"$(NAME)"' -DVERSION='"$(VERSION)"' \
-			 -Dlua=1 -DCONFIG_TYPE=$(CONFIG_TYPE)
-LUAOBJ=include/lua.o
-OBJS=include/blocks.o include/x.o include/utils.o
-
 PKGS=x11 xft
-FLAGS=-Wall -Wextra -pedantic -O3 -ggdb -pthread
+PATCHES=
+SRCDIRS=include include/patches
+OBJS=include/blocks.o \
+		 include/x.o \
+		 include/utils.o \
+		 $(PATCHES:%=include/patches/%.o)
 
-ifeq ($(CONFIG_TYPE), lua)
+ifneq ($(filter lua,$(PATCHES)),)
 PKGS+=lua
-OBJS+=$(LUAOBJ)
 endif
 
-# In case 'pkg-config' is not installed, update these variables accordingly.
-CFLAGS+=$(DEFINE) $(FLAGS) $(shell pkg-config --cflags $(PKGS))
-LDFLAGS+=$(shell pkg-config --libs $(PKGS))
+FLAGS=-Wall -Wextra -pedantic -I. -O3 -ggdb -pthread
+DEFINE=-DNAME='"$(NAME)"' -DVERSION='"$(VERSION)"' $(PATCHES:%=-DPatch_%)
+
+# In case 'pkg-config' is not installed, update LDFLAGS and CFLAGS accordingly.
+override CFLAGS+= $(FLAGS) $(DEFINE) $(shell pkg-config --cflags $(PKGS))
+LDFLAGS=-lpthread $(shell pkg-config --libs $(PKGS))

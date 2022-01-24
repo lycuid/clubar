@@ -52,10 +52,15 @@ Config create_config() {
   config.fonts = (char **)fonts;
   config.barConfig = barConfig;
 
-#if CONFIG_TYPE == lua
-#include "include/lua.h"
+#ifdef Patch_xrm
+#include "include/patches/xrm.h"
+  merge_xrm_config(&config);
+#endif
+
+#ifdef Patch_lua
+#include "include/patches/lua.h"
   if (CONFIG_FILE)
-    load_lua_config(CONFIG_FILE, &config);
+    merge_lua_config(CONFIG_FILE, &config);
 #endif
 
   return config;

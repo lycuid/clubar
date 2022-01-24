@@ -1,10 +1,10 @@
 include config.mk
 
-$(BIN): $(NAME).c $(OBJS) config.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $(BIN) $(NAME).c $(OBJS)
+$(BIN): options $(MAIN) $(OBJS) config.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $(BIN) $(MAIN) $(OBJS)
 
 %.o: %.c %.h
-	$(CC) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
@@ -20,19 +20,23 @@ options:
 	@echo "$(NAME) build options:"
 	@echo "CC       = $(CC)"
 	@echo "PKGS     = $(PKGS)"
-	@echo "CFLAGS   = $(CFLAGS)"
+	@echo "OBJS     = $(OBJS)"
 	@echo "LDFLAGS  = $(LDFLAGS)"
+	@echo "CFLAGS   = $(CFLAGS)"
+	@echo "----------------------------------"
 
 .PHONY: clean
 clean:
-	$(RM) $(BIN) $(OBJS) $(LUAOBJ)
+	$(RM) $(BIN) $(wildcard $(SRCDIRS:%=%/*.o))
 
 .PHONY: fmt
 fmt:
-	clang-format -i $(NAME).c config.h include/*.c include/*.h
+	clang-format -i $(MAIN) config.h
+	clang-format -i $(wildcard $(SRCDIRS:%=%/*.c))
+	clang-format -i $(wildcard $(SRCDIRS:%=%/*.h))
 
 .PHONY: install
-install: options $(BIN)
+install: $(BIN)
 	mkdir -p $(DESTDIR)$(BINPREFIX)
 	strip $(BIN)
 	cp $(BIN) $(DESTDIR)$(BINPREFIX)/$(NAME)

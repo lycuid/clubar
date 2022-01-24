@@ -77,7 +77,7 @@ void load_font_config(lua_State *L, Config *luaConfig) {
   }
 }
 
-void load_lua_config(const char *luafile, Config *luaConfig) {
+void merge_lua_config(const char *luafile, Config *luaConfig) {
   lua_State *L = luaL_newstate();
   luaL_openlibs(L);
   if (luaL_dofile(L, luafile))

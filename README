@@ -17,21 +17,30 @@ Build Requirements:
   - x11
   - xft
 
-Optional:
+Optional Requirements:
 ---------
   - pkg-config  (update 'config.mk', if 'pkg-config' not installed).
   - lua         (runtime configurations support).
 
 Build and install:
 ------------------
-  default build:
+  Default build:
     $ make
 
-  build with runtime config support (lua):
-    $ make CONFIG_TYPE=LUA
+  Build with patches enabled:
+    $ make PATCHES="lua xrm ..."
 
-  install:
+  Install:
     $ sudo make install
+
+Available Patches:
+------------------
+  lua: runtime config support with lua source file.
+  xrm: runtime config support with X Resources.
+
+  (patches are just space seperated c filenames, from 'include/patches/',
+    without file extension.)
+
 
 How bar window renders:
 -----------------------
@@ -54,8 +63,8 @@ Setting 'WM_NAME':
   - slstatus <https://tools.suckless.org/slstatus>
   - smolprog <https://github.com/lycuid/smolprog> (much faster and overall just
         better than slstatus...coz. Rust. I guess?).
-  - Custom script example (using bash):
 
+  - Custom script example (using bash):
     #!/bin/bash
     while true; do
       xsetroot -name "$(whoami)@$(hostname) on $(uname -o) | $(date)"
