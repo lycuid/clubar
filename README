@@ -41,17 +41,16 @@ Available Patches:
   (patches are just space seperated c filenames, from 'include/patches/',
     without file extension.)
 
-
 How bar window renders:
 -----------------------
 
-  +-----------------------------------margin-----------------------------------+
-  | +------------------------------------------------------------------------+ |
-  | | +-------------------------------padding------------------------------+ | |
-  | | |stdin                                                        WM_NAME| | |
-  | | +--------------------------------------------------------------------+ | |
-  | +------------------------------------------------------------------------+ |
-  +----------------------------------------------------------------------------+
+  + - - - - - - - - - - - - - - - - - margin - - - - - - - - - - - - - - - - - +
+  ¦ +------------------------------------------------------------------------+ ¦
+  ¦ | + - - - - - - - - - - - - - - - padding - - - - - - - - - - - - - - -+ | ¦
+  ¦ | ¦stdin                                                        WM_NAME¦ | ¦
+  ¦ | +- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - + | ¦
+  ¦ +------------------------------------------------------------------------+ ¦
+  +- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - +
 
   - 'margin' is the empty space outside of the bar window.
   - 'padding' is the space between the bar window edges and the drawing region.
@@ -76,10 +75,10 @@ Styling text:
   Template for styling text:
     <Tag:Extension=Value> Text </Tag>
 
-  Valid Tags:
+  Tags:
     Fn, Fg, Bg, Box, BtnL, BtnM, BtnR, ScrlU, ScrlD
 
-  Valid Extensions (Optional):
+  Extensions (Optional):
     Shift, Ctrl, Super, Alt, Left, Right, Top, Bottom
 
   Valid Extensions for Tags:
@@ -97,7 +96,7 @@ Styling text:
     | ScrlD   | Shift, Ctrl, Super, Alt   |
     ---------------------------------------
 
-  Valid values for Tags:
+  Valid Values for Tags:
     <Fn=Number>
       'Number': index of 'fonts' array in 'config.h'.
       'fonts[0]' will be used as default font.

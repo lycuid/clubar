@@ -1,6 +1,6 @@
 include config.mk
 
-$(BIN): options $(MAIN) $(OBJS) config.h | $(BUILDDIR)
+$(BIN): $(MAIN) $(OBJS) config.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $(BIN) $(MAIN) $(OBJS)
 
 %.o: %.c %.h
@@ -9,9 +9,11 @@ $(BIN): options $(MAIN) $(OBJS) config.h | $(BUILDDIR)
 $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
 
+.PHONY: run
 run: $(BIN)
 	$(BIN) $(ARGS)
 
+.PHONY: debug
 debug: $(BIN)
 	gdb $(BIN)
 
@@ -36,7 +38,7 @@ fmt:
 	clang-format -i $(wildcard $(SRCDIRS:%=%/*.h))
 
 .PHONY: install
-install: $(BIN)
+install: options $(BIN)
 	mkdir -p $(DESTDIR)$(BINPREFIX)
 	strip $(BIN)
 	cp $(BIN) $(DESTDIR)$(BINPREFIX)/$(NAME)

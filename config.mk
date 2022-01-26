@@ -17,12 +17,15 @@ OBJS=include/blocks.o \
 		 include/utils.o \
 		 $(PATCHES:%=include/patches/%.o)
 
-ifneq ($(filter lua,$(PATCHES)),)
+ifneq ($(filter luaconfig,$(PATCHES)),)
 PKGS+=lua
 endif
 
-FLAGS=-Wall -Wextra -pedantic -I. -O3 -ggdb -pthread
-DEFINE=-DNAME='"$(NAME)"' -DVERSION='"$(VERSION)"' $(PATCHES:%=-DPatch_%)
+FLAGS=-Wall -Wextra -pedantic -I. -O3 -ggdb -pthread -std=c99
+DEFINE=-DNAME='"$(NAME)"' \
+			 -DVERSION='"$(VERSION)"' \
+			 -D_POSIX_C_SOURCE=200809 \
+			 $(PATCHES:%=-DPatch_%)
 
 # In case 'pkg-config' is not installed, update LDFLAGS and CFLAGS accordingly.
 override CFLAGS+= $(FLAGS) $(DEFINE) $(shell pkg-config --cflags $(PKGS))

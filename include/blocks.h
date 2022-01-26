@@ -44,6 +44,7 @@ typedef struct _Attribute {
 } Attribute;
 
 typedef struct {
+  int ntext;
   char text[64];
   Attribute *attrs[NullTag];
 } Block;

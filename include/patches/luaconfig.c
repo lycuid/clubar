@@ -1,3 +1,6 @@
+/* Enable Patch with: `make CFLAGS=luaconfig`
+ * This patch enables runtime configuration support using lua source code.
+ */
 #include "lua.h"
 #include <lauxlib.h>
 #include <lualib.h>
@@ -46,9 +49,9 @@ void load_bar_config(lua_State *L, BarConfig *barConfig) {
   const char *g_members[4] = {"x", "y", "w", "h"};
   const char *members[4] = {"left", "right", "top", "bottom"};
 
-  // @TODO: future me!.. Make sure there are no struct padding bugs during all
+  // @TODO: Make sure there are no struct padding bugs during all
   // the memcpy int_array -> struct.
-  // currently, don't how struct padding works...but this code works, gl.
+  // currently, don't know how struct padding works...but this code works, gl.
   if (GetTableAsIntArray(L, barindex, "geometry", g_members, ints, size))
     memcpy(&barConfig->geometry, ints, size * sizeof(int));
 

@@ -79,8 +79,8 @@ int parsetag(const char *text, Tag *tag, Extension *ext, char *val,
 
 void createblk(Block *blk, Attribute *attrs[NullTag], const char *text,
                int ntext) {
+  blk->ntext = ntext;
   memcpy(blk->text, text, ntext);
-  blk->text[ntext] = 0;
 
   for (int i = 0; i < NullTag; ++i)
     blk->attrs[i] = mkcopy(attrs[i]);

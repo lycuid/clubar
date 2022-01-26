@@ -1,3 +1,6 @@
+/* Enable Patch with: `make CFLAGS=xrmconfig`
+ * This patch enables runtime configuration support using X Resources.
+ */
 #include "xrm.h"
 #include <X11/Xlib.h>
 #include <X11/Xresource.h>

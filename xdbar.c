@@ -9,68 +9,79 @@
 #include <time.h>
 #include <unistd.h>
 
-#define BLOCK_BUF_SIZE (1 << 10)
+#define UpdateBar(blktype, buffer)                                             \
+  {                                                                            \
+    pthread_mutex_lock(&mutex);                                                \
+    Bar_ClearBlks(blktype, NBlks[blktype]);                                    \
+    pthread_mutex_unlock(&mutex);                                              \
+                                                                               \
+    freeblks(Blks[blktype], MAX_BLKS);                                         \
+    NBlks[blktype] = createblks(buffer, Blks[blktype]);                        \
+                                                                               \
+    pthread_mutex_lock(&mutex);                                                \
+    Bar_RenderBlks(blktype, Blks[blktype], NBlks[blktype]);                    \
+    pthread_mutex_unlock(&mutex);                                              \
+  }
 
+BarEvent get_event(char[BLOCK_BUF_SIZE]);
 void *stdin_handler();
-Config create_config();
+void create_config();
 void setup(Config *);
 void gracefully_exit();
 
-static Block Blks[2][MAX_BLKS];
-static int NBlks[2], BarExposed = 0, RunEventLoop = 1;
-static pthread_t thread_handle;
-static char *CONFIG_FILE = NULL;
+pthread_t thread_handle;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+Block Blks[2][MAX_BLKS];
+int NBlks[2], RunEventLoop = 1;
+char *ConfigFile = NULL;
+
+BarEvent get_event(char string[BLOCK_BUF_SIZE]) {
+  pthread_mutex_lock(&mutex);
+  BarEvent event = Bar_HandleEvent(Blks, NBlks, string);
+  pthread_mutex_unlock(&mutex);
+  return event;
+}
 
 void *stdin_handler() {
-  struct timespec ts = {.tv_nsec = 50 * 1e6};
-  while (!BarExposed)
-    nanosleep(&ts, &ts);
+  ssize_t nbuf;
+  size_t size = BLOCK_BUF_SIZE;
+  char *stdinstr = malloc(size), previous[size];
+  memset(stdinstr, 0, size);
+  memset(previous, 0, size);
 
-  size_t nbuf, alloc = BLOCK_BUF_SIZE;
-  char *stdinbuf = malloc(alloc), previous[alloc];
-  memset(stdinbuf, 0, alloc);
-  memset(previous, 0, alloc);
-
-  while ((nbuf = getline(&stdinbuf, &alloc, stdin)) > 1) {
-    stdinbuf[nbuf - 1] = 0;
-    if (strcmp(previous, stdinbuf) == 0)
+  while ((nbuf = getline(&stdinstr, &size, stdin)) > 1) {
+    // trim off newline.
+    stdinstr[nbuf - 1] = 0;
+    if (strcmp(previous, stdinstr) == 0)
       continue;
 
-    freeblks(Blks[Stdin], MAX_BLKS);
-    NBlks[Stdin] = createblks(stdinbuf, Blks[Stdin]);
-    Bar_RenderBlks(Stdin, Blks, NBlks);
-
-    memcpy(previous, stdinbuf, nbuf);
-    memset(stdinbuf, 0, nbuf);
+    UpdateBar(Stdin, stdinstr);
+    memcpy(previous, stdinstr, BLOCK_BUF_SIZE);
+    memset(stdinstr, 0, BLOCK_BUF_SIZE);
   }
   pthread_exit(0);
 }
 
-Config create_config() {
-  Config config;
-  config.nfonts = sizeof(fonts) / sizeof(*fonts);
-  config.fonts = (char **)fonts;
-  config.barConfig = barConfig;
+void create_config(Config *config) {
+  config->nfonts = sizeof(fonts) / sizeof(*fonts);
+  config->fonts = (char **)fonts;
+  config->barConfig = barConfig;
 
-#ifdef Patch_xrm
-#include "include/patches/xrm.h"
+#ifdef Patch_xrmconfig
+#include "include/patches/xrmconfig.h"
   merge_xrm_config(&config);
 #endif
 
-#ifdef Patch_lua
-#include "include/patches/lua.h"
-  if (CONFIG_FILE)
-    merge_lua_config(CONFIG_FILE, &config);
+#ifdef Patch_luaconfig
+#include "include/patches/luaconfig.h"
+  if (ConfigFile)
+    merge_lua_config(ConfigFile, &config);
 #endif
-
-  return config;
 }
 
 void setup(Config *config) {
-  pthread_create(&thread_handle, NULL, stdin_handler, NULL);
   for (int i = 0; i < 2; ++i)
     NBlks[i] = 0;
-
   Bar_Setup(config);
   signal(SIGINT, gracefully_exit);
   signal(SIGHUP, gracefully_exit);
@@ -80,35 +91,39 @@ void setup(Config *config) {
 void gracefully_exit() { RunEventLoop = 0; }
 
 int main(int argc, char **argv) {
-  char arg;
+  Config config;
+  char arg, customstr[BLOCK_BUF_SIZE];
   while ((arg = getopt(argc, argv, "hvc:")) != -1) {
     switch (arg) {
     case 'h':
       usage();
-      exit(0);
+      exit(EXIT_SUCCESS);
     case 'v':
-      puts(NAME "-" VERSION);
-      exit(0);
+      puts(NAME ": v" VERSION);
+      exit(EXIT_SUCCESS);
     case 'c':
-      CONFIG_FILE = optarg;
+      ConfigFile = optarg;
       break;
     default:
       exit(2);
     }
   }
 
-  char customstr[BLOCK_BUF_SIZE];
+  create_config(&config);
+  setup(&config);
   struct timespec ts = {.tv_nsec = 1e6 * 25};
 
-  Config config = create_config();
-  setup(&config);
-
   while (RunEventLoop) {
-    nanosleep(&ts, &ts);
-    if (Bar_HandleEvent(Blks, NBlks, customstr, &BarExposed)) {
-      freeblks(Blks[Custom], MAX_BLKS);
-      NBlks[Custom] = createblks(customstr, Blks[Custom]);
-      Bar_RenderBlks(Custom, Blks, NBlks);
+    nanosleep(&ts, NULL);
+    switch (get_event(customstr)) {
+    case ReadyEvent:
+      pthread_create(&thread_handle, NULL, stdin_handler, NULL);
+      break;
+    case DrawEvent:
+      UpdateBar(Custom, customstr);
+      break;
+    case NoActionEvent:
+      break;
     }
   }
 

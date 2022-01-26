@@ -39,35 +39,16 @@ static int scr;
 static char *wm_name;
 static RenderInfo Infos[2][MAX_BLKS];
 
-inline int ParseBoxString(const char *, char[32]);
 XftColor *get_cached_color(const char *);
-void createctx();
-void createbar();
-void clearbar();
-void xsetup();
-void xsetatoms();
-void xcleanup();
-void xrenderblks(Block[MAX_BLKS], int, RenderInfo[MAX_BLKS]);
-void preparestdinblks(Block[MAX_BLKS], int);
-void preparecustomblks(Block[MAX_BLKS], int);
-void handle_xbuttonpress(XButtonEvent *, Block[2][MAX_BLKS], int[2]);
-
-inline int ParseBoxString(const char *val, char color[32]) {
-  int ptr = 0, c = 0, nval = strlen(val), size = 0;
-  memset(color, 0, 32);
-
-  while (ptr < nval && val[ptr] != ':')
-    color[c++] = val[ptr++];
-
-  if (val[ptr++] == ':')
-    while (ptr < nval && val[ptr] >= '0' && val[ptr] <= '9')
-      size = (size * 10) + val[ptr++] - '0';
-
-  if (ptr < nval - 1)
-    die("Invalid Box template string: %s\n", val);
-
-  return size > 0 ? size : 1;
-}
+int parse_box_string(const char *, char[32]);
+void createctx(const Config *);
+void createbar(const BarConfig *);
+void clearbar(int, int, int, int);
+void xsetatoms(const BarConfig *);
+void xrenderblks(const Block[MAX_BLKS], int, RenderInfo[MAX_BLKS]);
+void preparestdinblks(const Block[MAX_BLKS], int);
+void preparecustomblks(const Block[MAX_BLKS], int);
+void handle_xbuttonpress(XButtonEvent *, const Block[2][MAX_BLKS], int[2]);
 
 XftColor *get_cached_color(const char *colorname) {
   ColorCache *cache = ctx.colorcache;
@@ -88,7 +69,24 @@ XftColor *get_cached_color(const char *colorname) {
   return &ctx.colorcache->val;
 }
 
-void createctx(const Config *const config) {
+int parse_box_string(const char *val, char color[32]) {
+  int ptr = 0, c = 0, nval = strlen(val), size = 0;
+  memset(color, 0, 32);
+
+  while (ptr < nval && val[ptr] != ':')
+    color[c++] = val[ptr++];
+
+  if (val[ptr++] == ':')
+    while (ptr < nval && val[ptr] >= '0' && val[ptr] <= '9')
+      size = (size * 10) + val[ptr++] - '0';
+
+  if (ptr < nval - 1)
+    die("Invalid Box template string: %s\n", val);
+
+  return size > 0 ? size : 1;
+}
+
+void createctx(const Config *config) {
   ctx.vis = DefaultVisual(dpy, scr);
   ctx.cmap = DefaultColormap(dpy, scr);
 
@@ -101,7 +99,7 @@ void createctx(const Config *const config) {
   ctx.colorcache = NULL;
 }
 
-void createbar(const BarConfig *const barConfig) {
+void createbar(const BarConfig *barConfig) {
   Geometry geometry = barConfig->geometry;
   bar.window_g = (Geometry){geometry.x, geometry.y, geometry.w, geometry.h};
 
@@ -124,13 +122,14 @@ void createbar(const BarConfig *const barConfig) {
   bar.canvas = XftDrawCreate(dpy, bar.xwindow, ctx.vis, ctx.cmap);
 }
 
-void clearbar() {
-  XftDrawRect(bar.canvas, &bar.background, 0, 0, bar.window_g.w,
-              bar.window_g.h);
+void clearbar(int startx, int starty, int endx, int endy) {
+  XftDrawRect(bar.canvas, &bar.background, startx, starty, endx, endy);
 }
 
-void xsetup(const Config *const config) {
-  XInitThreads();
+void xsetup(const Config *config) {
+  for (int i = 0; i < MAX_BLKS; ++i)
+    Infos[Stdin][i] = Infos[Custom][i] = (RenderInfo){0, 0};
+
   if ((dpy = XOpenDisplay(NULL)) == NULL)
     die("Cannot open display.\n");
   root = DefaultRootWindow(dpy);
@@ -145,7 +144,7 @@ void xsetup(const Config *const config) {
   XMapWindow(dpy, bar.xwindow);
 }
 
-void xsetatoms(const BarConfig *const barConfig) {
+void xsetatoms(const BarConfig *barConfig) {
   long barheight =
       bar.window_g.h + barConfig->margin.top + barConfig->margin.bottom;
   long top = barConfig->topbar ? barheight : 0;
@@ -174,7 +173,7 @@ void xsetatoms(const BarConfig *const barConfig) {
   XStoreName(dpy, bar.xwindow, NAME);
 }
 
-void xcleanup() {
+void xcleanup(void) {
   while (ctx.colorcache != NULL) {
     XftColorFree(dpy, ctx.vis, ctx.cmap, &ctx.colorcache->val);
     ColorCache *stale = ctx.colorcache;
@@ -191,7 +190,8 @@ void xcleanup() {
   XCloseDisplay(dpy);
 }
 
-void xrenderblks(Block blks[MAX_BLKS], int nblk, RenderInfo ris[MAX_BLKS]) {
+void xrenderblks(const Block blks[MAX_BLKS], int nblk,
+                 RenderInfo ris[MAX_BLKS]) {
   int starty, size, fnindex;
   char color[32];
   XftColor *fg;
@@ -199,7 +199,7 @@ void xrenderblks(Block blks[MAX_BLKS], int nblk, RenderInfo ris[MAX_BLKS]) {
   Geometry *canvas_g = &bar.canvas_g;
 
   for (int i = 0; i < nblk; ++i) {
-    Block *blk = &blks[i];
+    const Block *blk = &blks[i];
     RenderInfo *ri = &ris[i];
 
     if (blk->attrs[Bg] != NULL)
@@ -208,7 +208,7 @@ void xrenderblks(Block blks[MAX_BLKS], int nblk, RenderInfo ris[MAX_BLKS]) {
 
     box = blk->attrs[Box];
     while (box != NULL) {
-      size = ParseBoxString(box->val, color);
+      size = parse_box_string(box->val, color);
       if (size) {
         int bx = canvas_g->x, by = canvas_g->y, bw = 0, bh = 0;
         switch (box->extension) {
@@ -240,17 +240,17 @@ void xrenderblks(Block blks[MAX_BLKS], int nblk, RenderInfo ris[MAX_BLKS]) {
     fg = blk->attrs[Fg] != NULL ? get_cached_color(blk->attrs[Fg]->val)
                                 : &bar.foreground;
     XftDrawStringUtf8(bar.canvas, fg, ctx.fonts[fnindex], ri->x, starty,
-                      (FcChar8 *)blk->text, strlen(blk->text));
+                      (FcChar8 *)blk->text, blk->ntext);
   }
 }
 
-void preparestdinblks(Block Blks[MAX_BLKS], int NBlks) {
+void preparestdinblks(const Block blks[MAX_BLKS], int nblks) {
   int renderx = 0;
-  for (int i = 0; i < NBlks; ++i) {
-    Block *blk = &Blks[i];
+  for (int i = 0; i < nblks; ++i) {
+    const Block *blk = &blks[i];
     int fnindex = blk->attrs[Fn] ? atoi(blk->attrs[Fn]->val) : 0;
     XftTextExtentsUtf8(dpy, ctx.fonts[fnindex], (FcChar8 *)blk->text,
-                       strlen(blk->text), &extent);
+                       blk->ntext, &extent);
 
     Infos[Stdin][i].width = extent.xOff;
     Infos[Stdin][i].x = renderx + extent.x;
@@ -258,13 +258,13 @@ void preparestdinblks(Block Blks[MAX_BLKS], int NBlks) {
   }
 }
 
-void preparecustomblks(Block Blks[MAX_BLKS], int NBlks) {
+void preparecustomblks(const Block blks[MAX_BLKS], int nblks) {
   int renderx = bar.canvas_g.x + bar.canvas_g.w;
-  for (int i = NBlks - 1; i >= 0; --i) {
-    Block *blk = &Blks[i];
+  for (int i = nblks - 1; i >= 0; --i) {
+    const Block *blk = &blks[i];
     int fnindex = blk->attrs[Fn] ? atoi(blk->attrs[Fn]->val) : 0;
     XftTextExtentsUtf8(dpy, ctx.fonts[fnindex], (FcChar8 *)blk->text,
-                       strlen(blk->text), &extent);
+                       blk->ntext, &extent);
 
     Infos[Custom][i].width = extent.xOff;
     renderx -= extent.x + extent.xOff;
@@ -272,29 +272,32 @@ void preparecustomblks(Block Blks[MAX_BLKS], int NBlks) {
   }
 }
 
-void renderblks(BlockType blktype, Block Blks[2][MAX_BLKS], int NBlks[2]) {
-  XLockDisplay(dpy);
-  switch (blktype) {
-  case Stdin:
-    preparestdinblks(Blks[Stdin], NBlks[Stdin]);
-    break;
-  case Custom:
-    preparecustomblks(Blks[Custom], NBlks[Custom]);
-    break;
+void clearblks(BlockType blktype, int nblks) {
+  if (nblks) {
+    RenderInfo *first = &Infos[blktype][0], *last = &Infos[blktype][nblks - 1];
+    clearbar(first->x, 0, last->x + last->width, bar.window_g.h);
   }
-  clearbar();
-  xrenderblks(Blks[Stdin], NBlks[Stdin], Infos[Stdin]);
-  xrenderblks(Blks[Custom], NBlks[Custom], Infos[Custom]);
-  XUnlockDisplay(dpy);
 }
 
-void handle_xbuttonpress(XButtonEvent *btn, Block Blks[2][MAX_BLKS],
-                         int NBlks[2]) {
-  for (int i = 0; i < NBlks[Stdin] + NBlks[Custom]; ++i) {
-    Block *blk =
-        i < NBlks[Stdin] ? &Blks[Stdin][i] : &Blks[Custom][i - NBlks[Stdin]];
+void renderblks(BlockType blktype, const Block blks[MAX_BLKS], int nblks) {
+  switch (blktype) {
+  case Stdin:
+    preparestdinblks(blks, nblks);
+    break;
+  case Custom:
+    preparecustomblks(blks, nblks);
+    break;
+  }
+  xrenderblks(blks, nblks, Infos[blktype]);
+}
+
+void handle_xbuttonpress(XButtonEvent *btn, const Block blks[2][MAX_BLKS],
+                         int nblks[2]) {
+  for (int i = 0; i < nblks[Stdin] + nblks[Custom]; ++i) {
+    const Block *blk =
+        i < nblks[Stdin] ? &blks[Stdin][i] : &blks[Custom][i - nblks[Stdin]];
     RenderInfo *ri =
-        i < NBlks[Stdin] ? &Infos[Stdin][i] : &Infos[Custom][i - NBlks[Stdin]];
+        i < nblks[Stdin] ? &Infos[Stdin][i] : &Infos[Custom][i - nblks[Stdin]];
 
     if (btn->x >= ri->x && btn->x <= ri->x + ri->width) {
       Tag tag = btn->button == Button1   ? BtnL
@@ -324,27 +327,30 @@ void handle_xbuttonpress(XButtonEvent *btn, Block Blks[2][MAX_BLKS],
   }
 }
 
-int handle_xevent(Block Blks[2][MAX_BLKS], int NBlks[2], char *name,
-                  int *exposed) {
+BarEvent handle_xevent(const Block blks[2][MAX_BLKS], int nblks[2],
+                  char name[BLOCK_BUF_SIZE]) {
   if (XPending(dpy)) {
     XNextEvent(dpy, &e);
 
     if (e.type == Expose) {
+      clearbar(0, 0, bar.window_g.w, bar.window_g.h);
       if (XStoreName(dpy, root, NAME "-" VERSION) == BadAlloc)
         eprintf("XStoreName failed.\n");
-      *exposed = 1;
+      return ReadyEvent;
     }
 
     if (e.type == PropertyNotify && e.xproperty.window == root &&
         XFetchName(dpy, root, &wm_name) >= 0) {
-      strcpy(name, wm_name);
-      XFree(wm_name);
-      return 1;
+      if (wm_name) {
+        strcpy(name, wm_name);
+        XFree(wm_name);
+        return DrawEvent;
+      }
     }
 
     if (e.type == ButtonPress)
-      handle_xbuttonpress(&e.xbutton, Blks, NBlks);
+      handle_xbuttonpress(&e.xbutton, blks, nblks);
   }
 
-  return 0;
+  return NoActionEvent;
 }
