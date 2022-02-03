@@ -1,7 +1,8 @@
-/* Enable Patch with: `make CFLAGS=luaconfig`
+/* Enable Patch with: `make PATCHES=luaconfig`
  * This patch enables runtime configuration support using lua source code.
+ * check 'examples' directory for sample configs.
  */
-#include "lua.h"
+#include "luaconfig.h"
 #include <lauxlib.h>
 #include <lualib.h>
 #include <stdlib.h>

@@ -1,12 +1,11 @@
 #include "x.h"
 #include <X11/Xatom.h>
-#include <X11/Xft/Xft.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
 typedef struct {
   int x, width;
-} RenderInfo;
+} GlyphInfo;
 
 typedef struct _ColorCache {
   char name[32];
@@ -14,44 +13,33 @@ typedef struct _ColorCache {
   struct _ColorCache *previous;
 } ColorCache;
 
-typedef struct {
+struct Draw {
   int nfonts;
   Visual *vis;
   Colormap cmap;
   XftFont **fonts;
+  GlyphInfo gis[2][MAX_BLKS];
   ColorCache *colorcache;
-} Context;
+} drw;
 
-typedef struct {
+struct Bar {
   Window xwindow;
   XftDraw *canvas;
   Geometry window_g, canvas_g;
   XftColor foreground, background;
-} Bar;
+} bar;
 
-static XEvent e;
-static XGlyphInfo extent;
-static Context ctx;
-static Bar bar;
-static Display *dpy;
-static Window root;
-static int scr;
-static char *wm_name;
-static RenderInfo Infos[2][MAX_BLKS];
+#define ClearBar(x, y, w, h)                                                   \
+  XftDrawRect(bar.canvas, &bar.background, x, y, w, h);
 
-XftColor *get_cached_color(const char *);
-int parse_box_string(const char *, char[32]);
-void createctx(const Config *);
-void createbar(const BarConfig *);
-void clearbar(int, int, int, int);
-void xsetatoms(const BarConfig *);
-void xrenderblks(const Block[MAX_BLKS], int, RenderInfo[MAX_BLKS]);
-void preparestdinblks(const Block[MAX_BLKS], int);
-void preparecustomblks(const Block[MAX_BLKS], int);
-void handle_xbuttonpress(XButtonEvent *, const Block[2][MAX_BLKS], int[2]);
+Display *dpy;
+Window root;
+int scr;
+XEvent e;
+char *wm_name;
 
 XftColor *get_cached_color(const char *colorname) {
-  ColorCache *cache = ctx.colorcache;
+  ColorCache *cache = drw.colorcache;
   while (cache != NULL) {
     if (strcmp(cache->name, colorname) == 0)
       return &cache->val;
@@ -60,13 +48,13 @@ XftColor *get_cached_color(const char *colorname) {
 
   // @TODO: currently not handling error when allocating colors.
   ColorCache *color = (ColorCache *)malloc(sizeof(ColorCache));
-  XftColorAllocName(dpy, ctx.vis, ctx.cmap, colorname, &color->val);
+  XftColorAllocName(dpy, drw.vis, drw.cmap, colorname, &color->val);
 
   strcpy(color->name, colorname);
-  color->previous = ctx.colorcache;
-  ctx.colorcache = color;
+  color->previous = drw.colorcache;
+  drw.colorcache = color;
 
-  return &ctx.colorcache->val;
+  return &drw.colorcache->val;
 }
 
 int parse_box_string(const char *val, char color[32]) {
@@ -86,17 +74,17 @@ int parse_box_string(const char *val, char color[32]) {
   return size > 0 ? size : 1;
 }
 
-void createctx(const Config *config) {
-  ctx.vis = DefaultVisual(dpy, scr);
-  ctx.cmap = DefaultColormap(dpy, scr);
+void createdrw(const Config *config) {
+  drw.vis = DefaultVisual(dpy, scr);
+  drw.cmap = DefaultColormap(dpy, scr);
 
-  ctx.nfonts = config->nfonts;
+  drw.nfonts = config->nfonts;
 
-  ctx.fonts = (XftFont **)malloc(ctx.nfonts * sizeof(XftFont *));
-  for (int i = 0; i < ctx.nfonts; ++i)
-    ctx.fonts[i] = XftFontOpenName(dpy, scr, config->fonts[i]);
+  drw.fonts = (XftFont **)malloc(drw.nfonts * sizeof(XftFont *));
+  for (int i = 0; i < drw.nfonts; ++i)
+    drw.fonts[i] = XftFontOpenName(dpy, scr, config->fonts[i]);
 
-  ctx.colorcache = NULL;
+  drw.colorcache = NULL;
 }
 
 void createbar(const BarConfig *barConfig) {
@@ -114,28 +102,24 @@ void createbar(const BarConfig *barConfig) {
                                     bar.window_g.w, bar.window_g.h, 0,
                                     WhitePixel(dpy, scr), BlackPixel(dpy, scr));
 
-  XftColorAllocName(dpy, ctx.vis, ctx.cmap, barConfig->foreground,
+  XftColorAllocName(dpy, drw.vis, drw.cmap, barConfig->foreground,
                     &bar.foreground);
-  XftColorAllocName(dpy, ctx.vis, ctx.cmap, barConfig->background,
+  XftColorAllocName(dpy, drw.vis, drw.cmap, barConfig->background,
                     &bar.background);
 
-  bar.canvas = XftDrawCreate(dpy, bar.xwindow, ctx.vis, ctx.cmap);
-}
-
-void clearbar(int startx, int starty, int endx, int endy) {
-  XftDrawRect(bar.canvas, &bar.background, startx, starty, endx, endy);
+  bar.canvas = XftDrawCreate(dpy, bar.xwindow, drw.vis, drw.cmap);
 }
 
 void xsetup(const Config *config) {
   for (int i = 0; i < MAX_BLKS; ++i)
-    Infos[Stdin][i] = Infos[Custom][i] = (RenderInfo){0, 0};
+    drw.gis[Stdin][i] = drw.gis[Custom][i] = (GlyphInfo){0, 0};
 
   if ((dpy = XOpenDisplay(NULL)) == NULL)
     die("Cannot open display.\n");
   root = DefaultRootWindow(dpy);
   scr = DefaultScreen(dpy);
 
-  createctx(config);
+  createdrw(config);
   createbar(&config->barConfig);
 
   XSelectInput(dpy, root, PropertyChangeMask);
@@ -174,24 +158,23 @@ void xsetatoms(const BarConfig *barConfig) {
 }
 
 void xcleanup(void) {
-  while (ctx.colorcache != NULL) {
-    XftColorFree(dpy, ctx.vis, ctx.cmap, &ctx.colorcache->val);
-    ColorCache *stale = ctx.colorcache;
-    ctx.colorcache = ctx.colorcache->previous;
+  while (drw.colorcache != NULL) {
+    XftColorFree(dpy, drw.vis, drw.cmap, &drw.colorcache->val);
+    ColorCache *stale = drw.colorcache;
+    drw.colorcache = drw.colorcache->previous;
     free(stale);
   }
 
-  for (int fn = 0; fn < ctx.nfonts; ++fn)
-    XftFontClose(dpy, ctx.fonts[fn]);
+  for (int fn = 0; fn < drw.nfonts; ++fn)
+    XftFontClose(dpy, drw.fonts[fn]);
 
-  XftColorFree(dpy, ctx.vis, ctx.cmap, &bar.foreground);
-  XftColorFree(dpy, ctx.vis, ctx.cmap, &bar.background);
+  XftColorFree(dpy, drw.vis, drw.cmap, &bar.foreground);
+  XftColorFree(dpy, drw.vis, drw.cmap, &bar.background);
   XftDrawDestroy(bar.canvas);
   XCloseDisplay(dpy);
 }
 
-void xrenderblks(const Block blks[MAX_BLKS], int nblk,
-                 RenderInfo ris[MAX_BLKS]) {
+void xrenderblks(BlockType blktype, const Block blks[MAX_BLKS], int nblk) {
   int starty, size, fnindex;
   char color[32];
   XftColor *fg;
@@ -200,11 +183,11 @@ void xrenderblks(const Block blks[MAX_BLKS], int nblk,
 
   for (int i = 0; i < nblk; ++i) {
     const Block *blk = &blks[i];
-    RenderInfo *ri = &ris[i];
+    const GlyphInfo *gi = &drw.gis[blktype][i];
 
     if (blk->attrs[Bg] != NULL)
-      XftDrawRect(bar.canvas, get_cached_color(blk->attrs[Bg]->val), ri->x,
-                  canvas_g->y, ri->width, canvas_g->h);
+      XftDrawRect(bar.canvas, get_cached_color(blk->attrs[Bg]->val), gi->x,
+                  canvas_g->y, gi->width, canvas_g->h);
 
     box = blk->attrs[Box];
     while (box != NULL) {
@@ -213,17 +196,17 @@ void xrenderblks(const Block blks[MAX_BLKS], int nblk,
         int bx = canvas_g->x, by = canvas_g->y, bw = 0, bh = 0;
         switch (box->extension) {
         case Top:
-          bx = ri->x, bw = ri->width, bh = size;
+          bx = gi->x, bw = gi->width, bh = size;
           break;
         case Bottom:
-          bx = ri->x, by = canvas_g->y + canvas_g->h - size, bw = ri->width,
+          bx = gi->x, by = canvas_g->y + canvas_g->h - size, bw = gi->width,
           bh = size;
           break;
         case Left:
-          bx = ri->x, bw = size, bh = canvas_g->h;
+          bx = gi->x, bw = size, bh = canvas_g->h;
           break;
         case Right:
-          bx = ri->x + ri->width - size, bw = size, bh = canvas_g->h;
+          bx = gi->x + gi->width - size, bw = size, bh = canvas_g->h;
           break;
         default:
           break;
@@ -235,71 +218,74 @@ void xrenderblks(const Block blks[MAX_BLKS], int nblk,
     }
 
     fnindex = blk->attrs[Fn] != NULL ? atoi(blk->attrs[Fn]->val) : 0;
-    starty = canvas_g->y + (canvas_g->h - ctx.fonts[fnindex]->height) / 2 +
-             ctx.fonts[fnindex]->ascent;
+    starty = canvas_g->y + (canvas_g->h - drw.fonts[fnindex]->height) / 2 +
+             drw.fonts[fnindex]->ascent;
     fg = blk->attrs[Fg] != NULL ? get_cached_color(blk->attrs[Fg]->val)
                                 : &bar.foreground;
-    XftDrawStringUtf8(bar.canvas, fg, ctx.fonts[fnindex], ri->x, starty,
+    XftDrawStringUtf8(bar.canvas, fg, drw.fonts[fnindex], gi->x, starty,
                       (FcChar8 *)blk->text, blk->ntext);
-  }
-}
-
-void preparestdinblks(const Block blks[MAX_BLKS], int nblks) {
-  int renderx = 0;
-  for (int i = 0; i < nblks; ++i) {
-    const Block *blk = &blks[i];
-    int fnindex = blk->attrs[Fn] ? atoi(blk->attrs[Fn]->val) : 0;
-    XftTextExtentsUtf8(dpy, ctx.fonts[fnindex], (FcChar8 *)blk->text,
-                       blk->ntext, &extent);
-
-    Infos[Stdin][i].width = extent.xOff;
-    Infos[Stdin][i].x = renderx + extent.x;
-    renderx += Infos[Stdin][i].width;
-  }
-}
-
-void preparecustomblks(const Block blks[MAX_BLKS], int nblks) {
-  int renderx = bar.canvas_g.x + bar.canvas_g.w;
-  for (int i = nblks - 1; i >= 0; --i) {
-    const Block *blk = &blks[i];
-    int fnindex = blk->attrs[Fn] ? atoi(blk->attrs[Fn]->val) : 0;
-    XftTextExtentsUtf8(dpy, ctx.fonts[fnindex], (FcChar8 *)blk->text,
-                       blk->ntext, &extent);
-
-    Infos[Custom][i].width = extent.xOff;
-    renderx -= extent.x + extent.xOff;
-    Infos[Custom][i].x = renderx;
   }
 }
 
 void clearblks(BlockType blktype, int nblks) {
   if (nblks) {
-    RenderInfo *first = &Infos[blktype][0], *last = &Infos[blktype][nblks - 1];
-    clearbar(first->x, 0, last->x + last->width, bar.window_g.h);
+    GlyphInfo *first = &drw.gis[blktype][0],
+              *last = &drw.gis[blktype][nblks - 1];
+    ClearBar(first->x, 0, last->x + last->width, bar.window_g.h);
+  }
+}
+
+inline void prepare_stdinblks(const Block blks[MAX_BLKS], int nblks) {
+  XGlyphInfo extent;
+  int fnindex, startx = 0;
+  for (int i = 0; i < nblks; ++i) {
+    const Block *blk = &blks[i];
+    fnindex = blk->attrs[Fn] ? atoi(blk->attrs[Fn]->val) : 0;
+    XftTextExtentsUtf8(dpy, drw.fonts[fnindex], (FcChar8 *)blk->text,
+                       blk->ntext, &extent);
+
+    drw.gis[Stdin][i].width = extent.xOff;
+    drw.gis[Stdin][i].x = startx + extent.x;
+    startx += drw.gis[Stdin][i].width;
+  }
+}
+
+inline void prepare_customblks(const Block blks[MAX_BLKS], int nblks) {
+  XGlyphInfo extent;
+  int fnindex, startx = bar.canvas_g.x + bar.canvas_g.w;
+  for (int i = nblks - 1; i >= 0; --i) {
+    const Block *blk = &blks[i];
+    fnindex = blk->attrs[Fn] ? atoi(blk->attrs[Fn]->val) : 0;
+    XftTextExtentsUtf8(dpy, drw.fonts[fnindex], (FcChar8 *)blk->text,
+                       blk->ntext, &extent);
+
+    drw.gis[Custom][i].width = extent.xOff;
+    startx -= extent.x + extent.xOff;
+    drw.gis[Custom][i].x = startx;
   }
 }
 
 void renderblks(BlockType blktype, const Block blks[MAX_BLKS], int nblks) {
   switch (blktype) {
   case Stdin:
-    preparestdinblks(blks, nblks);
+    prepare_stdinblks(blks, nblks);
     break;
   case Custom:
-    preparecustomblks(blks, nblks);
+    prepare_customblks(blks, nblks);
     break;
   }
-  xrenderblks(blks, nblks, Infos[blktype]);
+  xrenderblks(blktype, blks, nblks);
 }
 
-void handle_xbuttonpress(XButtonEvent *btn, const Block blks[2][MAX_BLKS],
+void handle_xbuttonpress(XButtonEvent *btn, Block blks[2][MAX_BLKS],
                          int nblks[2]) {
   for (int i = 0; i < nblks[Stdin] + nblks[Custom]; ++i) {
-    const Block *blk =
+    Block *blk =
         i < nblks[Stdin] ? &blks[Stdin][i] : &blks[Custom][i - nblks[Stdin]];
-    RenderInfo *ri =
-        i < nblks[Stdin] ? &Infos[Stdin][i] : &Infos[Custom][i - nblks[Stdin]];
+    GlyphInfo *gi = i < nblks[Stdin] ? &drw.gis[Stdin][i]
+                                     : &drw.gis[Custom][i - nblks[Stdin]];
 
-    if (btn->x >= ri->x && btn->x <= ri->x + ri->width) {
+    if (btn->x >= gi->x && btn->x <= gi->x + gi->width) {
       Tag tag = btn->button == Button1   ? BtnL
                 : btn->button == Button2 ? BtnM
                 : btn->button == Button3 ? BtnR
@@ -327,13 +313,13 @@ void handle_xbuttonpress(XButtonEvent *btn, const Block blks[2][MAX_BLKS],
   }
 }
 
-BarEvent handle_xevent(const Block blks[2][MAX_BLKS], int nblks[2],
-                  char name[BLOCK_BUF_SIZE]) {
+BarEvent handle_xevent(Block blks[2][MAX_BLKS], int nblks[2],
+                       char name[BLOCK_BUF_SIZE]) {
   if (XPending(dpy)) {
     XNextEvent(dpy, &e);
 
     if (e.type == Expose) {
-      clearbar(0, 0, bar.window_g.w, bar.window_g.h);
+      ClearBar(0, 0, bar.window_g.w, bar.window_g.h);
       if (XStoreName(dpy, root, NAME "-" VERSION) == BadAlloc)
         eprintf("XStoreName failed.\n");
       return ReadyEvent;

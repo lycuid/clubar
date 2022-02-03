@@ -9,17 +9,23 @@
 #include <time.h>
 #include <unistd.h>
 
+pthread_t thread_handle;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+Block Blks[2][MAX_BLKS];
+int NBlks[2], RunEventLoop = 1;
+char *ConfigFile = NULL;
+
 #define UpdateBar(blktype, buffer)                                             \
   {                                                                            \
     pthread_mutex_lock(&mutex);                                                \
-    Bar_ClearBlks(blktype, NBlks[blktype]);                                    \
+    XDBClearBlks(blktype, NBlks[blktype]);                                     \
     pthread_mutex_unlock(&mutex);                                              \
                                                                                \
     freeblks(Blks[blktype], MAX_BLKS);                                         \
     NBlks[blktype] = createblks(buffer, Blks[blktype]);                        \
                                                                                \
     pthread_mutex_lock(&mutex);                                                \
-    Bar_RenderBlks(blktype, Blks[blktype], NBlks[blktype]);                    \
+    XDBRenderBlks(blktype, Blks[blktype], NBlks[blktype]);                     \
     pthread_mutex_unlock(&mutex);                                              \
   }
 
@@ -29,15 +35,9 @@ void create_config();
 void setup(Config *);
 void gracefully_exit();
 
-pthread_t thread_handle;
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-Block Blks[2][MAX_BLKS];
-int NBlks[2], RunEventLoop = 1;
-char *ConfigFile = NULL;
-
 BarEvent get_event(char string[BLOCK_BUF_SIZE]) {
   pthread_mutex_lock(&mutex);
-  BarEvent event = Bar_HandleEvent(Blks, NBlks, string);
+  BarEvent event = XDBHandleEvent(Blks, NBlks, string);
   pthread_mutex_unlock(&mutex);
   return event;
 }
@@ -69,20 +69,20 @@ void create_config(Config *config) {
 
 #ifdef Patch_xrmconfig
 #include "include/patches/xrmconfig.h"
-  merge_xrm_config(&config);
+  merge_xrm_config(config);
 #endif
 
 #ifdef Patch_luaconfig
 #include "include/patches/luaconfig.h"
   if (ConfigFile)
-    merge_lua_config(ConfigFile, &config);
+    merge_lua_config(ConfigFile, config);
 #endif
 }
 
 void setup(Config *config) {
   for (int i = 0; i < 2; ++i)
     NBlks[i] = 0;
-  Bar_Setup(config);
+  XDBSetup(config);
   signal(SIGINT, gracefully_exit);
   signal(SIGHUP, gracefully_exit);
   signal(SIGTERM, gracefully_exit);
@@ -129,6 +129,6 @@ int main(int argc, char **argv) {
 
   // doesn't make any sense to keep the thread running, after event loop stops.
   pthread_cancel(thread_handle);
-  Bar_Cleanup();
+  XDBCleanup();
   return 0;
 }

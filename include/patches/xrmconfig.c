@@ -1,12 +1,23 @@
-/* Enable Patch with: `make CFLAGS=xrmconfig`
+/* Enable Patch with: `make PATCHES=xrmconfig`
  * This patch enables runtime configuration support using X Resources.
+ * check 'examples' directory for sample configs.
  */
-#include "xrm.h"
+#include "xrmconfig.h"
 #include <X11/Xlib.h>
 #include <X11/Xresource.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#define Chunk(x_ptr, x_ptr_start, x_ptr_end, xs, nxs)                          \
+  {                                                                            \
+    int size = x_ptr_end - x_ptr_start + 1;                                    \
+    xs = realloc(xs, (nxs + 1) * sizeof(char *));                              \
+    xs[nxs] = malloc(size);                                                    \
+    memcpy(xs[nxs], x_ptr[x_ptr_start], size);                                 \
+    xs[nxs++][size - 1] = 0;                                                   \
+    x_ptr_start = x_ptr_end + 1;                                               \
+  }
 
 void merge_xrm_config(Config *config) {
   char *value;
@@ -20,6 +31,18 @@ void merge_xrm_config(Config *config) {
   XrmInitialize();
   const char *resm = XResourceManagerString(dpy);
   XrmDatabase db = XrmGetStringDatabase(resm);
+
+  if (XrmGetResource(db, NAME ".fonts", "*", &value, &xrm_value)) {
+    size_t start, current;
+    config->fonts = NULL;
+    config->nfonts = 0;
+    for (start = 0, current = 0; current < xrm_value.size; ++current) {
+      if (xrm_value.addr[current] == ',' && start < current)
+        Chunk(&xrm_value.addr, start, current, config->fonts, config->nfonts);
+    }
+    if (start < current)
+      Chunk(&xrm_value.addr, start, current, config->fonts, config->nfonts);
+  }
 
   if (XrmGetResource(db, NAME ".barConfig.geometry", "*", &value, &xrm_value))
     if (sscanf(xrm_value.addr, "%u,%u,%u,%u", &barConfig->geometry.x,

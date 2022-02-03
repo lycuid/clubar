@@ -1,7 +1,7 @@
 XD Bar
--------
-A minialistic statusbar, inspired by 'X'mobar and 'D'wm statusbar, for X11
-Desktops that are compatible with EWMH standards.
+------
+A minialistic, lightweight, customizable statusbar, inspired by 'X'mobar and
+'D'wm statusbar, for X11 Desktops, that are compatible with EWMH standards.
 
 Rendering styled/clickable text, is inspired by xmobar's approach of having
 tags in the string (https://xmobar.org/).
@@ -14,13 +14,13 @@ Future Goals: Maybe rewrite in Rust. :pepehands:
 Build Requirements:
 -------------------
   - gnu make
-  - x11
-  - xft
+  - libx11
+  - libxft
 
 Optional Requirements:
----------
-  - pkg-config  (update 'config.mk', if 'pkg-config' not installed).
-  - lua         (runtime configurations support).
+----------------------
+  - pkg-config  (if not installed, update 'config.mk' accordingly).
+  - lua         (required if using 'luaconfig' patch).
 
 Build and install:
 ------------------
@@ -28,15 +28,15 @@ Build and install:
     $ make
 
   Build with patches enabled:
-    $ make PATCHES="lua xrm ..."
+    $ make PATCHES="luaconfig xrmconfig ..."
 
   Install:
     $ sudo make install
 
 Available Patches:
 ------------------
-  lua: runtime config support with lua source file.
-  xrm: runtime config support with X Resources.
+  luaconfig: runtime config support with lua source file.
+  xrmconfig: runtime config support with X Resources.
 
   (patches are just space seperated c filenames, from 'include/patches/',
     without file extension.)
@@ -82,9 +82,9 @@ Styling text:
     Shift, Ctrl, Super, Alt, Left, Right, Top, Bottom
 
   Valid Extensions for Tags:
-    ---------------------------------------
+    +-------------------------------------+
     | Tag     | Extensions                |
-    ---------------------------------------
+    |---------+---------------------------|
     | Fn      | -                         |
     | Fg      | -                         |
     | Bg      | -                         |
@@ -94,7 +94,7 @@ Styling text:
     | BtnR    | Shift, Ctrl, Super, Alt   |
     | ScrlU   | Shift, Ctrl, Super, Alt   |
     | ScrlD   | Shift, Ctrl, Super, Alt   |
-    ---------------------------------------
+    +-------------------------------------+
 
   Valid Values for Tags:
     <Fn=Number>
@@ -126,3 +126,7 @@ Example text:
   - <ScrlU:Ctrl=amixer sset Master 5%+><ScrlD:Ctrl=amixer sset Master 5%->
       volume
     </ScrlD></ScrlU>
+
+Licence:
+--------
+  GPLv3 <https://gnu.org/licenses/gpl.html>

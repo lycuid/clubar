@@ -1,0 +1,14 @@
+! This is an example for updating configurations using X Resources
+! Either this can be added to '~/.Xdefaults' or '~/.Xresources' file.
+! Or this file can be merged with the X Resource database.
+! Reference: https://wiki.archlinux.org/title/x_resources
+
+xdbar.barConfig.geometry: 0,0,1366,32
+xdbar.barConfig.padding: 0, 0, 0, 0
+xdbar.barConfig.margin: 0, 0, 0, 0
+xdbar.barConfig.topbar: true
+xdbar.barConfig.foreground: #efefef
+xdbar.barConfig.background: #090909
+xdbar.fonts: monospace-11,monospace-11:Bold
+
+! vim:ft=xdefaults

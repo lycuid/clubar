@@ -1,7 +1,7 @@
 # constants.
 NAME:=xdbar
 MAIN:=$(NAME).c
-VERSION:=0.2.0
+VERSION:=0.2.1
 BUILDDIR:=bin
 BIN:=$(BUILDDIR)/$(NAME)
 # install paths.
