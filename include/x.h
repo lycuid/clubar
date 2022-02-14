@@ -10,22 +10,17 @@ void xsetup(const Config *);
 void xsetatoms(const BarConfig *);
 void xcleanup(void);
 void xrenderblks(BlockType, const Block[MAX_BLKS], int);
-#if __has_attribute(always_inline)
-__attribute__((always_inline)) void prepare_stdinblks(const Block[MAX_BLKS],
-                                                      int);
-__attribute__((always_inline)) void prepare_customblks(const Block[MAX_BLKS],
-                                                       int);
-#else
-inline void prepare_stdinblks(const Block[MAX_BLKS], int);
-inline void prepare_customblks(const Block[MAX_BLKS], int);
-#endif
+__inline__ void prepare_stdinblks(const Block[MAX_BLKS], int);
+__inline__ void prepare_customblks(const Block[MAX_BLKS], int);
 void clearblks(BlockType, int);
 void renderblks(BlockType, const Block[MAX_BLKS], int);
-void handle_xbuttonpress(XButtonEvent *, Block[2][MAX_BLKS], int[2]);
+int onExpose(Block[2][MAX_BLKS], int[2]);
+void onButtonPress(const XEvent *, Block[2][MAX_BLKS], int[2]);
+int onPropertyNotify(const XEvent *, char *);
 BarEvent handle_xevent(Block[2][MAX_BLKS], int[2], char[BLOCK_BUF_SIZE]);
 
-#define XDBSetup xsetup
-#define XDBClearBlks clearblks
-#define XDBRenderBlks renderblks
-#define XDBHandleEvent handle_xevent
-#define XDBCleanup xcleanup
+#define xdb_setup xsetup
+#define xdb_clearblks clearblks
+#define xdb_renderblks renderblks
+#define xdb_nextevent handle_xevent
+#define xdb_cleanup xcleanup

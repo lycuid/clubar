@@ -30,13 +30,15 @@ struct Bar {
 } bar;
 
 #define ClearBar(x, y, w, h)                                                   \
-  XftDrawRect(bar.canvas, &bar.background, x, y, w, h);
+  XftDrawRect(bar.canvas, &bar.background, x, y, w, h)
 
 Display *dpy;
 Window root;
 int scr;
 XEvent e;
 char *wm_name;
+static Atom AtomWMName;
+static int BarExposed = 0;
 
 XftColor *get_cached_color(const char *colorname) {
   ColorCache *cache = drw.colorcache;
@@ -98,9 +100,9 @@ void createbar(const BarConfig *barConfig) {
   bar.canvas_g.h =
       bar.window_g.h - barConfig->padding.top - barConfig->padding.bottom;
 
-  bar.xwindow = XCreateSimpleWindow(dpy, root, bar.window_g.x, bar.window_g.y,
-                                    bar.window_g.w, bar.window_g.h, 0,
-                                    WhitePixel(dpy, scr), BlackPixel(dpy, scr));
+  bar.xwindow =
+      XCreateSimpleWindow(dpy, root, bar.window_g.x, bar.window_g.y,
+                          bar.window_g.w, bar.window_g.h, 0, 0xffffff, 0);
 
   XftColorAllocName(dpy, drw.vis, drw.cmap, barConfig->foreground,
                     &bar.foreground);
@@ -118,11 +120,11 @@ void xsetup(const Config *config) {
     die("Cannot open display.\n");
   root = DefaultRootWindow(dpy);
   scr = DefaultScreen(dpy);
+  AtomWMName = XInternAtom(dpy, "WM_NAME", 0);
 
   createdrw(config);
   createbar(&config->barConfig);
 
-  XSelectInput(dpy, root, PropertyChangeMask);
   XSelectInput(dpy, bar.xwindow, ExposureMask | ButtonPressMask);
   xsetatoms(&config->barConfig);
   XMapWindow(dpy, bar.xwindow);
@@ -235,7 +237,7 @@ void clearblks(BlockType blktype, int nblks) {
   }
 }
 
-inline void prepare_stdinblks(const Block blks[MAX_BLKS], int nblks) {
+__inline__ void prepare_stdinblks(const Block blks[MAX_BLKS], int nblks) {
   XGlyphInfo extent;
   int fnindex, startx = 0;
   for (int i = 0; i < nblks; ++i) {
@@ -250,7 +252,7 @@ inline void prepare_stdinblks(const Block blks[MAX_BLKS], int nblks) {
   }
 }
 
-inline void prepare_customblks(const Block blks[MAX_BLKS], int nblks) {
+__inline__ void prepare_customblks(const Block blks[MAX_BLKS], int nblks) {
   XGlyphInfo extent;
   int fnindex, startx = bar.canvas_g.x + bar.canvas_g.w;
   for (int i = nblks - 1; i >= 0; --i) {
@@ -277,27 +279,39 @@ void renderblks(BlockType blktype, const Block blks[MAX_BLKS], int nblks) {
   xrenderblks(blktype, blks, nblks);
 }
 
-void handle_xbuttonpress(XButtonEvent *btn, Block blks[2][MAX_BLKS],
-                         int nblks[2]) {
+int onExpose(Block blks[2][MAX_BLKS], int nblks[2]) {
+  ClearBar(0, 0, bar.window_g.w, bar.window_g.h);
+  if (!BarExposed && (BarExposed = 1)) {
+    XSelectInput(dpy, root, PropertyChangeMask);
+    XStoreName(dpy, root, NAME "-" VERSION);
+    return 1;
+  }
+  renderblks(Stdin, blks[Stdin], nblks[Stdin]);
+  renderblks(Custom, blks[Custom], nblks[Custom]);
+  return 0;
+}
+
+void onButtonPress(const XEvent *xe, Block blks[2][MAX_BLKS], int nblks[2]) {
+  const XButtonEvent *e = &xe->xbutton;
   for (int i = 0; i < nblks[Stdin] + nblks[Custom]; ++i) {
     Block *blk =
         i < nblks[Stdin] ? &blks[Stdin][i] : &blks[Custom][i - nblks[Stdin]];
     GlyphInfo *gi = i < nblks[Stdin] ? &drw.gis[Stdin][i]
                                      : &drw.gis[Custom][i - nblks[Stdin]];
 
-    if (btn->x >= gi->x && btn->x <= gi->x + gi->width) {
-      Tag tag = btn->button == Button1   ? BtnL
-                : btn->button == Button2 ? BtnM
-                : btn->button == Button3 ? BtnR
-                : btn->button == Button4 ? ScrlU
-                : btn->button == Button5 ? ScrlD
-                                         : NullTag;
+    if (e->x >= gi->x && e->x <= gi->x + gi->width) {
+      Tag tag = e->button == Button1   ? BtnL
+                : e->button == Button2 ? BtnM
+                : e->button == Button3 ? BtnR
+                : e->button == Button4 ? ScrlU
+                : e->button == Button5 ? ScrlD
+                                       : NullTag;
 
-      Extension ext = btn->state == ShiftMask     ? Shift
-                      : btn->state == ControlMask ? Ctrl
-                      : btn->state == Mod1Mask    ? Super
-                      : btn->state == Mod4Mask    ? Alt
-                                                  : NullExt;
+      Extension ext = e->state == ShiftMask     ? Shift
+                      : e->state == ControlMask ? Ctrl
+                      : e->state == Mod1Mask    ? Super
+                      : e->state == Mod4Mask    ? Alt
+                                                : NullExt;
 
       if (tag != NullTag) {
         Attribute *action = blk->attrs[tag];
@@ -313,30 +327,42 @@ void handle_xbuttonpress(XButtonEvent *btn, Block blks[2][MAX_BLKS],
   }
 }
 
+int onPropertyNotify(const XEvent *xe, char *name) {
+  const XPropertyEvent *e = &xe->xproperty;
+  if (e->window == root && e->atom == AtomWMName) {
+    if (XFetchName(dpy, root, &wm_name) >= 0 && wm_name) {
+      strcpy(name, wm_name);
+      XFree(wm_name);
+      return 1;
+    }
+  }
+  return 0;
+}
+
 BarEvent handle_xevent(Block blks[2][MAX_BLKS], int nblks[2],
                        char name[BLOCK_BUF_SIZE]) {
   if (XPending(dpy)) {
     XNextEvent(dpy, &e);
 
-    if (e.type == Expose) {
-      ClearBar(0, 0, bar.window_g.w, bar.window_g.h);
-      if (XStoreName(dpy, root, NAME "-" VERSION) == BadAlloc)
-        eprintf("XStoreName failed.\n");
-      return ReadyEvent;
-    }
+    switch (e.type) {
+    // bar window events.
+    case Expose:
+      if (onExpose(blks, nblks))
+        return ReadyEvent;
+      break;
+    case ButtonPress:
+      onButtonPress(&e, blks, nblks);
+      break;
 
-    if (e.type == PropertyNotify && e.xproperty.window == root &&
-        XFetchName(dpy, root, &wm_name) >= 0) {
-      if (wm_name) {
-        strcpy(name, wm_name);
-        XFree(wm_name);
+    // root window events.
+    case PropertyNotify:
+      if (onPropertyNotify(&e, name))
         return DrawEvent;
-      }
+      break;
+
+    default:
+      break;
     }
-
-    if (e.type == ButtonPress)
-      handle_xbuttonpress(&e.xbutton, blks, nblks);
   }
-
   return NoActionEvent;
 }

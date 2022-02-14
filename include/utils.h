@@ -3,6 +3,12 @@
 
 #include <stdarg.h>
 
+#if __has_attribute(always_inline)
+#define __inline__ __attribute__((always_inline)) inline
+#else
+#define __inline__ inline
+#endif
+
 #define MAX_BLKS (1 << 6)
 #define BLOCK_BUF_SIZE (1 << 10)
 
@@ -22,7 +28,7 @@ typedef struct {
 } Geometry;
 
 typedef struct {
-  int topbar;
+  int topbar : 1;
   Geometry geometry;
   struct {
     unsigned int left, right, top, bottom;

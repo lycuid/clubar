@@ -43,7 +43,10 @@ void load_bar_config(lua_State *L, BarConfig *barConfig) {
 
   GetString(L, barindex, "foreground", (char *)barConfig->foreground);
   GetString(L, barindex, "background", (char *)barConfig->background);
-  GetField(L, barindex, "topbar", &barConfig->topbar, lua_toboolean);
+
+  int topbar = 0;
+  GetField(L, barindex, "topbar", &topbar, lua_toboolean);
+  barConfig->topbar = topbar;
 
   int size = 4;
   int ints[size];

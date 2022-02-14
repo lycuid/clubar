@@ -11,38 +11,55 @@
 
 pthread_t thread_handle;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 Block Blks[2][MAX_BLKS];
-int NBlks[2], RunEventLoop = 1;
+int NBlks[2] = {0, 0}, RunEventLoop = 1;
 char *ConfigFile = NULL;
+
+BarEvent nextevent(char[BLOCK_BUF_SIZE]);
+void *stdin_handler();
+void create_config();
+void setup(Config *);
+void gracefully_exit();
 
 #define UpdateBar(blktype, buffer)                                             \
   {                                                                            \
     pthread_mutex_lock(&mutex);                                                \
-    XDBClearBlks(blktype, NBlks[blktype]);                                     \
+    xdb_clearblks(blktype, NBlks[blktype]);                                    \
     pthread_mutex_unlock(&mutex);                                              \
                                                                                \
     freeblks(Blks[blktype], MAX_BLKS);                                         \
     NBlks[blktype] = createblks(buffer, Blks[blktype]);                        \
                                                                                \
     pthread_mutex_lock(&mutex);                                                \
-    XDBRenderBlks(blktype, Blks[blktype], NBlks[blktype]);                     \
+    xdb_renderblks(blktype, Blks[blktype], NBlks[blktype]);                    \
     pthread_mutex_unlock(&mutex);                                              \
   }
 
-BarEvent get_event(char[BLOCK_BUF_SIZE]);
-void *stdin_handler();
-void create_config();
-void setup(Config *);
-void gracefully_exit();
+#define ThreadPause()                                                          \
+  {                                                                            \
+    pthread_mutex_lock(&mutex);                                                \
+    pthread_cond_wait(&cond, &mutex);                                          \
+    pthread_mutex_unlock(&mutex);                                              \
+  }
 
-BarEvent get_event(char string[BLOCK_BUF_SIZE]) {
+#define ThreadResumeAll()                                                      \
+  {                                                                            \
+    pthread_mutex_lock(&mutex);                                                \
+    pthread_cond_broadcast(&cond);                                             \
+    pthread_mutex_unlock(&mutex);                                              \
+  }
+
+BarEvent nextevent(char string[BLOCK_BUF_SIZE]) {
   pthread_mutex_lock(&mutex);
-  BarEvent event = XDBHandleEvent(Blks, NBlks, string);
+  BarEvent event = xdb_nextevent(Blks, NBlks, string);
   pthread_mutex_unlock(&mutex);
   return event;
 }
 
 void *stdin_handler() {
+  ThreadPause();
+
   ssize_t nbuf;
   size_t size = BLOCK_BUF_SIZE;
   char *stdinstr = malloc(size), previous[size];
@@ -80,9 +97,8 @@ void create_config(Config *config) {
 }
 
 void setup(Config *config) {
-  for (int i = 0; i < 2; ++i)
-    NBlks[i] = 0;
-  XDBSetup(config);
+  pthread_create(&thread_handle, NULL, stdin_handler, NULL);
+  xdb_setup(config);
   signal(SIGINT, gracefully_exit);
   signal(SIGHUP, gracefully_exit);
   signal(SIGTERM, gracefully_exit);
@@ -115,9 +131,9 @@ int main(int argc, char **argv) {
 
   while (RunEventLoop) {
     nanosleep(&ts, NULL);
-    switch (get_event(customstr)) {
+    switch (nextevent(customstr)) {
     case ReadyEvent:
-      pthread_create(&thread_handle, NULL, stdin_handler, NULL);
+      ThreadResumeAll();
       break;
     case DrawEvent:
       UpdateBar(Custom, customstr);
@@ -129,6 +145,6 @@ int main(int argc, char **argv) {
 
   // doesn't make any sense to keep the thread running, after event loop stops.
   pthread_cancel(thread_handle);
-  XDBCleanup();
+  xdb_cleanup();
   return 0;
 }
