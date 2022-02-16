@@ -180,23 +180,23 @@ void xrenderblks(BlockType blktype, const Block blks[MAX_BLKS], int nblk) {
   int starty, size, fnindex;
   char color[32];
   XftColor *fg;
-  Attribute *box;
+  Tag *box;
   Geometry *canvas_g = &bar.canvas_g;
 
   for (int i = 0; i < nblk; ++i) {
     const Block *blk = &blks[i];
     const GlyphInfo *gi = &drw.gis[blktype][i];
 
-    if (blk->attrs[Bg] != NULL)
-      XftDrawRect(bar.canvas, get_cached_color(blk->attrs[Bg]->val), gi->x,
+    if (blk->tags[Bg] != NULL)
+      XftDrawRect(bar.canvas, get_cached_color(blk->tags[Bg]->val), gi->x,
                   canvas_g->y, gi->width, canvas_g->h);
 
-    box = blk->attrs[Box];
+    box = blk->tags[Box];
     while (box != NULL) {
       size = parse_box_string(box->val, color);
       if (size) {
         int bx = canvas_g->x, by = canvas_g->y, bw = 0, bh = 0;
-        switch (box->extension) {
+        switch (box->modifier) {
         case Top:
           bx = gi->x, bw = gi->width, bh = size;
           break;
@@ -219,11 +219,11 @@ void xrenderblks(BlockType blktype, const Block blks[MAX_BLKS], int nblk) {
       box = box->previous;
     }
 
-    fnindex = blk->attrs[Fn] != NULL ? atoi(blk->attrs[Fn]->val) : 0;
+    fnindex = blk->tags[Fn] != NULL ? atoi(blk->tags[Fn]->val) : 0;
     starty = canvas_g->y + (canvas_g->h - drw.fonts[fnindex]->height) / 2 +
              drw.fonts[fnindex]->ascent;
-    fg = blk->attrs[Fg] != NULL ? get_cached_color(blk->attrs[Fg]->val)
-                                : &bar.foreground;
+    fg = blk->tags[Fg] != NULL ? get_cached_color(blk->tags[Fg]->val)
+                               : &bar.foreground;
     XftDrawStringUtf8(bar.canvas, fg, drw.fonts[fnindex], gi->x, starty,
                       (FcChar8 *)blk->text, blk->ntext);
   }
@@ -242,7 +242,7 @@ __inline__ void prepare_stdinblks(const Block blks[MAX_BLKS], int nblks) {
   int fnindex, startx = 0;
   for (int i = 0; i < nblks; ++i) {
     const Block *blk = &blks[i];
-    fnindex = blk->attrs[Fn] ? atoi(blk->attrs[Fn]->val) : 0;
+    fnindex = blk->tags[Fn] ? atoi(blk->tags[Fn]->val) : 0;
     XftTextExtentsUtf8(dpy, drw.fonts[fnindex], (FcChar8 *)blk->text,
                        blk->ntext, &extent);
 
@@ -257,7 +257,7 @@ __inline__ void prepare_customblks(const Block blks[MAX_BLKS], int nblks) {
   int fnindex, startx = bar.canvas_g.x + bar.canvas_g.w;
   for (int i = nblks - 1; i >= 0; --i) {
     const Block *blk = &blks[i];
-    fnindex = blk->attrs[Fn] ? atoi(blk->attrs[Fn]->val) : 0;
+    fnindex = blk->tags[Fn] ? atoi(blk->tags[Fn]->val) : 0;
     XftTextExtentsUtf8(dpy, drw.fonts[fnindex], (FcChar8 *)blk->text,
                        blk->ntext, &extent);
 
@@ -300,24 +300,23 @@ void onButtonPress(const XEvent *xe, Block blks[2][MAX_BLKS], int nblks[2]) {
                                      : &drw.gis[Custom][i - nblks[Stdin]];
 
     if (e->x >= gi->x && e->x <= gi->x + gi->width) {
-      Tag tag = e->button == Button1   ? BtnL
-                : e->button == Button2 ? BtnM
-                : e->button == Button3 ? BtnR
-                : e->button == Button4 ? ScrlU
-                : e->button == Button5 ? ScrlD
-                                       : NullTag;
+      TagKey key = e->button == Button1   ? BtnL
+                   : e->button == Button2 ? BtnM
+                   : e->button == Button3 ? BtnR
+                   : e->button == Button4 ? ScrlU
+                   : e->button == Button5 ? ScrlD
+                                          : NullKey;
 
-      Extension ext = e->state == ShiftMask     ? Shift
-                      : e->state == ControlMask ? Ctrl
-                      : e->state == Mod1Mask    ? Super
-                      : e->state == Mod4Mask    ? Alt
-                                                : NullExt;
+      TagModifier mod = e->state == ShiftMask     ? Shift
+                        : e->state == ControlMask ? Ctrl
+                        : e->state == Mod1Mask    ? Super
+                        : e->state == Mod4Mask    ? Alt
+                                                  : NullModifier;
 
-      if (tag != NullTag) {
-        Attribute *action = blk->attrs[tag];
+      if (key != NullKey) {
+        Tag *action = blk->tags[key];
         while (action != NULL) {
-          if (strlen(action->val) &&
-              (action->extension == NullExt || action->extension == ext))
+          if (strlen(action->val) && action->modifier == mod)
             system(action->val);
           action = action->previous;
         }

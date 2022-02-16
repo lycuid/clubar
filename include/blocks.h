@@ -4,8 +4,8 @@
 #define TAG_START "<"
 #define TAG_END ">"
 
-typedef enum { Fn, Fg, Bg, Box, BtnL, BtnM, BtnR, ScrlU, ScrlD, NullTag } Tag;
-static const char *const TagRepr[NullTag] = {
+typedef enum { Fn, Fg, Bg, Box, BtnL, BtnM, BtnR, ScrlU, ScrlD, NullKey } TagKey;
+static const char *const TagKeyRepr[NullKey] = {
     [Fn] = "Fn",     [Fg] = "Fg",       [Bg] = "Bg",
     [Box] = "Box",   [BtnL] = "BtnL",   [BtnM] = "BtnM",
     [BtnR] = "BtnR", [ScrlU] = "ScrlU", [ScrlD] = "ScrlD"};
@@ -19,41 +19,41 @@ typedef enum {
   Right,
   Top,
   Bottom,
-  NullExt
-} Extension;
-static const char *const ExtRepr[NullExt] = {
+  NullModifier
+} TagModifier;
+static const char *const TagModifierRepr[NullModifier] = {
     [Shift] = "Shift", [Ctrl] = "Ctrl",    [Super] = "Super",
     [Alt] = "Alt",     [Left] = "Left",    [Right] = "Right",
     [Top] = "Top",     [Bottom] = "Bottom"};
 
-static const Extension AllowedTagExtensions[NullTag][NullExt] = {
-    [Fn] = {NullExt},
-    [Fg] = {NullExt},
-    [Bg] = {NullExt},
-    [Box] = {Left, Right, Top, Bottom, NullExt},
-    [BtnL] = {Shift, Ctrl, Super, Alt, NullExt},
-    [BtnM] = {Shift, Ctrl, Super, Alt, NullExt},
-    [BtnR] = {Shift, Ctrl, Super, Alt, NullExt},
-    [ScrlU] = {Shift, Ctrl, Super, Alt, NullExt},
-    [ScrlD] = {Shift, Ctrl, Super, Alt, NullExt}};
+static const TagModifier AllowedTagModifiers[NullKey][NullModifier] = {
+    [Fn] = {NullModifier},
+    [Fg] = {NullModifier},
+    [Bg] = {NullModifier},
+    [Box] = {Left, Right, Top, Bottom, NullModifier},
+    [BtnL] = {Shift, Ctrl, Super, Alt, NullModifier},
+    [BtnM] = {Shift, Ctrl, Super, Alt, NullModifier},
+    [BtnR] = {Shift, Ctrl, Super, Alt, NullModifier},
+    [ScrlU] = {Shift, Ctrl, Super, Alt, NullModifier},
+    [ScrlD] = {Shift, Ctrl, Super, Alt, NullModifier}};
 
-typedef struct _Attribute {
+typedef struct _Tag {
+  TagModifier modifier;
   char val[64];
-  Extension extension;
-  struct _Attribute *previous;
-} Attribute;
+  struct _Tag *previous;
+} Tag;
 
 typedef struct {
   int ntext;
   char text[64];
-  Attribute *attrs[NullTag];
+  Tag *tags[NullKey];
 } Block;
 
-Attribute *mkcopy(Attribute *);
-Attribute *push(const char *, Extension, Attribute *);
-Attribute *pop(Attribute *);
-int parsetag(const char *, Tag *, Extension *, char *, int *);
-void createblk(Block *, Attribute *[NullTag], const char *, int);
+Tag *mkcopy(Tag *);
+Tag *push(const char *, TagModifier, Tag *);
+Tag *pop(Tag *);
+int parsetag(const char *, TagKey *, TagModifier *, char *, int *);
+void createblk(Block *, Tag *[NullKey], const char *, int);
 
 // public.
 void freeblks(Block *, int);
