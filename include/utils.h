@@ -4,9 +4,9 @@
 #include <stdarg.h>
 
 #if __has_attribute(always_inline)
-#define __inline__ __attribute__((always_inline)) inline
+#define __inline __attribute__((always_inline)) inline
 #else
-#define __inline__ inline
+#define __inline inline
 #endif
 
 #define MAX_BLKS (1 << 6)

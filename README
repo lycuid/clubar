@@ -72,18 +72,18 @@ Setting 'WM_NAME':
 
 Styling text:
 -------------
-  Template for styling text:
-    <Tag:Extension=Value> Text </Tag>
+  Template for styling text: (see examples below)
+    <Tag:Mod1|Mod2|...|Modn=Value> Text </Tag>
 
-  Tags:
+  Tag:
     Fn, Fg, Bg, Box, BtnL, BtnM, BtnR, ScrlU, ScrlD
 
-  Extensions (Optional):
+  Modifiers: (Optional; can be multiple, pipe seperated).
     Shift, Ctrl, Super, Alt, Left, Right, Top, Bottom
 
-  Valid Extensions for Tags:
+  Valid Modifiers for Tag:
     +-------------------------------------+
-    | Tag     | Extensions                |
+    | Key     | Modifiers                 |
     |---------+---------------------------|
     | Fn      | -                         |
     | Fg      | -                         |
@@ -119,13 +119,16 @@ Example text:
   - <Fg=#131313> Colored </Fg> text with <Bg=#c6c6c6> background</Bg>.
 
   - <Box:Bottom=#ffffff:1> underlined </Bottom> text.
+  - <Box:Top|Bottom|Left|Right=#ffffff:1> Boxed in </Bottom> text.
 
   - <BtnL=systemctl reboot> reboot </BtnL>
-  - <BtnL:Shift=sudo -A reboot now> reboot w/ confirmation </BtnL>
+  - <BtnL:Ctrl|Shift=sudo -A reboot now> reboot w/ confirmation </BtnL>
 
-  - <ScrlU:Ctrl=amixer sset Master 5%+><ScrlD:Ctrl=amixer sset Master 5%->
-      volume
-    </ScrlD></ScrlU>
+  - <ScrlU:Ctrl=amixer sset Master 5%+>
+      <ScrlD:Ctrl=amixer sset Master 5%->
+        volume
+      </ScrlD>
+    </ScrlU>
 
 Licence:
 --------

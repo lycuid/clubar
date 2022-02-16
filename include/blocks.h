@@ -4,12 +4,24 @@
 #define TAG_START "<"
 #define TAG_END ">"
 
-typedef enum { Fn, Fg, Bg, Box, BtnL, BtnM, BtnR, ScrlU, ScrlD, NullKey } TagKey;
+typedef enum {
+  Fn,
+  Fg,
+  Bg,
+  Box,
+  BtnL,
+  BtnM,
+  BtnR,
+  ScrlU,
+  ScrlD,
+  NullKey
+} TagKey;
 static const char *const TagKeyRepr[NullKey] = {
     [Fn] = "Fn",     [Fg] = "Fg",       [Bg] = "Bg",
     [Box] = "Box",   [BtnL] = "BtnL",   [BtnM] = "BtnM",
     [BtnR] = "BtnR", [ScrlU] = "ScrlU", [ScrlD] = "ScrlD"};
 
+typedef unsigned int TagModifierMask;
 typedef enum {
   Shift,
   Ctrl,
@@ -26,7 +38,7 @@ static const char *const TagModifierRepr[NullModifier] = {
     [Alt] = "Alt",     [Left] = "Left",    [Right] = "Right",
     [Top] = "Top",     [Bottom] = "Bottom"};
 
-static const TagModifier AllowedTagModifiers[NullKey][NullModifier] = {
+static const TagModifier ValidTagModifiers[NullKey][NullModifier] = {
     [Fn] = {NullModifier},
     [Fg] = {NullModifier},
     [Bg] = {NullModifier},
@@ -38,7 +50,7 @@ static const TagModifier AllowedTagModifiers[NullKey][NullModifier] = {
     [ScrlD] = {Shift, Ctrl, Super, Alt, NullModifier}};
 
 typedef struct _Tag {
-  TagModifier modifier;
+  TagModifierMask tmod_mask;
   char val[64];
   struct _Tag *previous;
 } Tag;
@@ -50,9 +62,9 @@ typedef struct {
 } Block;
 
 Tag *mkcopy(Tag *);
-Tag *push(const char *, TagModifier, Tag *);
+Tag *push(const char *, TagModifierMask, Tag *);
 Tag *pop(Tag *);
-int parsetag(const char *, TagKey *, TagModifier *, char *, int *);
+int parsetag(const char *, TagKey *, TagModifierMask *, char *, int *);
 void createblk(Block *, Tag *[NullKey], const char *, int);
 
 // public.

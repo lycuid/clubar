@@ -10,8 +10,6 @@ void xsetup(const Config *);
 void xsetatoms(const BarConfig *);
 void xcleanup(void);
 void xrenderblks(BlockType, const Block[MAX_BLKS], int);
-__inline__ void prepare_stdinblks(const Block[MAX_BLKS], int);
-__inline__ void prepare_customblks(const Block[MAX_BLKS], int);
 void clearblks(BlockType, int);
 void renderblks(BlockType, const Block[MAX_BLKS], int);
 int onExpose(Block[2][MAX_BLKS], int[2]);

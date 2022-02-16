@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define LOOP(cond) while ((cond))
+#define FreeTags(tag_ptr) while ((tag_ptr = pop(tag_ptr)))
 enum { Cur, New };
 
 Tag *mkcopy(Tag *root) {
@@ -10,15 +10,15 @@ Tag *mkcopy(Tag *root) {
     return NULL;
   Tag *tag = (Tag *)malloc(sizeof(Tag));
   strcpy(tag->val, root->val);
-  tag->modifier = root->modifier;
+  tag->tmod_mask = root->tmod_mask;
   tag->previous = mkcopy(root->previous);
   return tag;
 }
 
-Tag *push(const char *val, TagModifier mod, Tag *previous) {
+Tag *push(const char *val, TagModifierMask tmod_mask, Tag *previous) {
   Tag *tag = (Tag *)malloc(sizeof(Tag));
   strcpy(tag->val, val);
-  tag->modifier = mod;
+  tag->tmod_mask = tmod_mask;
   tag->previous = previous;
   return tag;
 }
@@ -31,8 +31,8 @@ Tag *pop(Tag *stale) {
   return tag;
 }
 
-int parsetag(const char *text, TagKey *key, TagModifier *mod, char *val,
-             int *closing) {
+int parsetag(const char *text, TagKey *tkey, TagModifierMask *tmod_mask,
+             char *val, int *closing) {
   int ptr = 0, nstart = strlen(TAG_START), nend = strlen(TAG_END), bufptr = 0;
 
   if (memcmp(text + ptr, TAG_START, nstart) != 0)
@@ -40,35 +40,42 @@ int parsetag(const char *text, TagKey *key, TagModifier *mod, char *val,
   ptr += nstart;
   *closing = text[ptr] == '/' && ptr++;
 
+  // parse tag key.
   for (TagKey t = 0; t < NullKey; ++t) {
     const char *key_repr = TagKeyRepr[t];
     if (memcmp(text + ptr, key_repr, strlen(key_repr)) == 0) {
       ptr += strlen(key_repr);
-      *key = t;
+      *tkey = t;
       break;
     }
   }
-  if (*key == NullKey)
+  if (*tkey == NullKey)
     return 0;
 
   if (!*closing) {
+    // parsing tag modifier.
     if (text[ptr] == ':' && ptr++) {
-      const TagModifier *mods = AllowedTagModifiers[*key];
-      int e = 0;
-      for (; mods[e] != NullModifier; ++e) {
-        const char *ext_repr = TagModifierRepr[mods[e]];
-        if (memcmp(text + ptr, ext_repr, strlen(ext_repr)) == 0) {
-          ptr += strlen(ext_repr);
-          *mod = mods[e];
-          break;
+      // atleast one modifier should be parsed after a colon (':').
+      const TagModifier *mods = ValidTagModifiers[*tkey];
+      do {
+        int e = 0;
+        for (; mods[e] != NullModifier; ++e) {
+          const char *tmod_repr = TagModifierRepr[mods[e]];
+          if (memcmp(text + ptr, tmod_repr, strlen(tmod_repr)) == 0) {
+            ptr += strlen(tmod_repr);
+            *tmod_mask |= (1 << mods[e]);
+            break;
+          }
         }
-      }
-      if (mods[e] == NullModifier)
-        return 0;
+        if (mods[e] == NullModifier)
+          return 0;
+        // keep parsing modifiers as long as it ends with pipe ('|').
+      } while (text[ptr] == '|' && ptr++);
     }
 
     if (text[ptr++] != '=')
       return 0;
+    // parse tag value.
     while (text[ptr] != TAG_END[0])
       val[bufptr++] = text[ptr++];
   }
@@ -90,8 +97,8 @@ void createblk(Block *blk, Tag *tags[NullKey], const char *text, int ntext) {
 int createblks(const char *name, Block *blks) {
   int len = strlen(name), nblks = 0, nbuf = 0, ptr, tagclose;
   char buf[len], val[len];
-  TagKey key;
-  TagModifier mod;
+  TagKey tkey;
+  TagModifierMask tmod_mask;
 
   Tag *tagstate[2][NullKey];
   for (TagKey tag = 0; tag < NullKey; ++tag)
@@ -99,16 +106,17 @@ int createblks(const char *name, Block *blks) {
 
   for (ptr = 0; ptr < len; ++ptr) {
     if (name[ptr] == TAG_START[0]) {
-      key = NullKey, mod = NullModifier, tagclose = 0;
+      tkey = NullKey, tmod_mask = 0x0, tagclose = 0;
       memset(val, 0, sizeof(val));
-      int size = parsetag(name + ptr, &key, &mod, val, &tagclose);
+      int size = parsetag(name + ptr, &tkey, &tmod_mask, val, &tagclose);
       // check for 'out of place' closing tag (closing tag without
       // corresponding opening tag).
-      int oop = tagclose && tagstate[New][key] == NULL;
+      int oop = tagclose && tagstate[New][tkey] == NULL;
       // tag parse success check.
-      if (size > 0 && key != NullKey && !oop) {
-        tagstate[New][key] = tagclose ? pop(tagstate[New][key])
-                                      : push(val, mod, tagstate[New][key]);
+      if (size > 0 && tkey != NullKey && !oop) {
+        tagstate[New][tkey] = tagclose
+                                  ? pop(tagstate[New][tkey])
+                                  : push(val, tmod_mask, tagstate[New][tkey]);
         // only creating a new block, if text is not empty as blocks with
         // empty text doesn't get rendered and that block becomes essentially
         // useless (very tiny memory/speed optimization).
@@ -117,8 +125,8 @@ int createblks(const char *name, Block *blks) {
 
         ptr += size;
         // State Update: copy 'New' tagstate to 'Cur' tagstate.
-        LOOP(tagstate[Cur][key] = pop(tagstate[Cur][key]));
-        tagstate[Cur][key] = mkcopy(tagstate[New][key]);
+        FreeTags(tagstate[Cur][tkey]);
+        tagstate[Cur][tkey] = mkcopy(tagstate[New][tkey]);
         // reset temp value buffer and continue loop, once state is updated.
         memset(buf, nbuf = 0, sizeof(buf));
         continue;
@@ -131,17 +139,15 @@ int createblks(const char *name, Block *blks) {
     createblk(&blks[nblks++], tagstate[Cur], buf, nbuf);
 
   for (int i = 0; i < NullKey; ++i) {
-    LOOP(tagstate[Cur][i] = pop(tagstate[Cur][i]));
-    LOOP(tagstate[New][i] = pop(tagstate[New][i]));
+    FreeTags(tagstate[Cur][i]);
+    FreeTags(tagstate[New][i]);
   }
 
   return nblks;
 }
 
 void freeblks(Block *blks, int nblks) {
-  for (int b = 0; b < nblks; ++b) {
-    Block *blk = &blks[b];
+  for (int b = 0; b < nblks; ++b)
     for (int i = 0; i < NullKey; ++i)
-      LOOP(blk->tags[i] = pop(blk->tags[i]));
-  }
+      FreeTags(blks[b].tags[i]);
 }

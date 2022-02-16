@@ -3,6 +3,9 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
+__inline void prepare_stdinblks(const Block[MAX_BLKS], int);
+__inline void prepare_customblks(const Block[MAX_BLKS], int);
+
 typedef struct {
   int x, width;
 } GlyphInfo;
@@ -193,28 +196,32 @@ void xrenderblks(BlockType blktype, const Block blks[MAX_BLKS], int nblk) {
 
     box = blk->tags[Box];
     while (box != NULL) {
-      size = parse_box_string(box->val, color);
-      if (size) {
+      if (!(size = parse_box_string(box->val, color)))
+        continue;
+      const TagModifier *mods = ValidTagModifiers[Box];
+      for (int e = 0; mods[e] != NullModifier; ++e) {
         int bx = canvas_g->x, by = canvas_g->y, bw = 0, bh = 0;
-        switch (box->modifier) {
-        case Top:
-          bx = gi->x, bw = gi->width, bh = size;
-          break;
-        case Bottom:
-          bx = gi->x, by = canvas_g->y + canvas_g->h - size, bw = gi->width,
-          bh = size;
-          break;
-        case Left:
-          bx = gi->x, bw = size, bh = canvas_g->h;
-          break;
-        case Right:
-          bx = gi->x + gi->width - size, bw = size, bh = canvas_g->h;
-          break;
-        default:
-          break;
+        if (box->tmod_mask & (1 << mods[e])) {
+          switch (mods[e]) {
+          case Top:
+            bx = gi->x, bw = gi->width, bh = size;
+            break;
+          case Bottom:
+            bx = gi->x, by = canvas_g->y + canvas_g->h - size, bw = gi->width,
+            bh = size;
+            break;
+          case Left:
+            bx = gi->x, bw = size, bh = canvas_g->h;
+            break;
+          case Right:
+            bx = gi->x + gi->width - size, bw = size, bh = canvas_g->h;
+            break;
+          default:
+            break;
+          }
+          XftColor *rectcolor = get_cached_color(color);
+          XftDrawRect(bar.canvas, rectcolor, bx, by, bw, bh);
         }
-        XftColor *rectcolor = get_cached_color(color);
-        XftDrawRect(bar.canvas, rectcolor, bx, by, bw, bh);
       }
       box = box->previous;
     }
@@ -237,7 +244,7 @@ void clearblks(BlockType blktype, int nblks) {
   }
 }
 
-__inline__ void prepare_stdinblks(const Block blks[MAX_BLKS], int nblks) {
+__inline void prepare_stdinblks(const Block blks[MAX_BLKS], int nblks) {
   XGlyphInfo extent;
   int fnindex, startx = 0;
   for (int i = 0; i < nblks; ++i) {
@@ -252,7 +259,7 @@ __inline__ void prepare_stdinblks(const Block blks[MAX_BLKS], int nblks) {
   }
 }
 
-__inline__ void prepare_customblks(const Block blks[MAX_BLKS], int nblks) {
+__inline void prepare_customblks(const Block blks[MAX_BLKS], int nblks) {
   XGlyphInfo extent;
   int fnindex, startx = bar.canvas_g.x + bar.canvas_g.w;
   for (int i = nblks - 1; i >= 0; --i) {
@@ -300,25 +307,29 @@ void onButtonPress(const XEvent *xe, Block blks[2][MAX_BLKS], int nblks[2]) {
                                      : &drw.gis[Custom][i - nblks[Stdin]];
 
     if (e->x >= gi->x && e->x <= gi->x + gi->width) {
-      TagKey key = e->button == Button1   ? BtnL
-                   : e->button == Button2 ? BtnM
-                   : e->button == Button3 ? BtnR
-                   : e->button == Button4 ? ScrlU
-                   : e->button == Button5 ? ScrlD
-                                          : NullKey;
+      TagKey tkey = e->button == Button1   ? BtnL
+                    : e->button == Button2 ? BtnM
+                    : e->button == Button3 ? BtnR
+                    : e->button == Button4 ? ScrlU
+                    : e->button == Button5 ? ScrlD
+                                           : NullKey;
 
-      TagModifier mod = e->state == ShiftMask     ? Shift
-                        : e->state == ControlMask ? Ctrl
-                        : e->state == Mod1Mask    ? Super
-                        : e->state == Mod4Mask    ? Alt
-                                                  : NullModifier;
+      TagModifierMask tmod_mask = 0x0;
+      if (e->state & ShiftMask)
+        tmod_mask |= (1 << Shift);
+      if (e->state & ControlMask)
+        tmod_mask |= (1 << Ctrl);
+      if (e->state & Mod1Mask)
+        tmod_mask |= (1 << Super);
+      if (e->state & Mod4Mask)
+        tmod_mask |= (1 << Alt);
 
-      if (key != NullKey) {
-        Tag *action = blk->tags[key];
-        while (action != NULL) {
-          if (strlen(action->val) && action->modifier == mod)
-            system(action->val);
-          action = action->previous;
+      if (tkey != NullKey) {
+        Tag *action_tag = blk->tags[tkey];
+        while (action_tag != NULL) {
+          if (strlen(action_tag->val) && action_tag->tmod_mask == tmod_mask)
+            system(action_tag->val);
+          action_tag = action_tag->previous;
         }
       }
       break;
