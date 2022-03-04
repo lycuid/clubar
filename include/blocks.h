@@ -1,6 +1,8 @@
 #ifndef __BLOCKS_H__
 #define __BLOCKS_H__
 
+#include <stdint.h>
+
 #define TAG_START "<"
 #define TAG_END ">"
 
@@ -21,7 +23,7 @@ static const char *const TagKeyRepr[NullKey] = {
     [Box] = "Box",   [BtnL] = "BtnL",   [BtnM] = "BtnM",
     [BtnR] = "BtnR", [ScrlU] = "ScrlU", [ScrlD] = "ScrlD"};
 
-typedef unsigned int TagModifierMask;
+typedef uint32_t TagModifierMask;
 typedef enum {
   Shift,
   Ctrl,

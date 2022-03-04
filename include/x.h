@@ -7,7 +7,6 @@ int parse_box_string(const char *, char[32]);
 void createdrw(const Config *);
 void createbar(const BarConfig *);
 void xsetup(const Config *);
-void xsetatoms(const BarConfig *);
 void xcleanup(void);
 void xrenderblks(BlockType, const Block[MAX_BLKS], int);
 void clearblks(BlockType, int);

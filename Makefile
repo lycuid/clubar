@@ -1,9 +1,12 @@
 include config.mk
 
-$(BIN): $(MAIN) $(OBJS) config.h | $(BUILDDIR)
+$(BIN): $(OBJS) | $(BUILDDIR)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $(BIN) $(MAIN) $(OBJS)
 
+$(BIN): config.h
+
 %.o: %.c %.h
+%.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILDDIR):
@@ -41,7 +44,7 @@ fmt:
 install: options $(BIN)
 	mkdir -p $(DESTDIR)$(BINPREFIX)
 	strip $(BIN)
-	cp $(BIN) $(DESTDIR)$(BINPREFIX)/$(NAME)
+	cp -f $(BIN) $(DESTDIR)$(BINPREFIX)/$(NAME)
 	chmod 755 $(DESTDIR)$(BINPREFIX)/$(NAME)
 
 .PHONY: uninstall

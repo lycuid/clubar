@@ -2,6 +2,7 @@
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <stdint.h>
 
 __inline void prepare_stdinblks(const Block[MAX_BLKS], int);
 __inline void prepare_customblks(const Block[MAX_BLKS], int);
@@ -124,35 +125,26 @@ void xsetup(const Config *config) {
   root = DefaultRootWindow(dpy);
   scr = DefaultScreen(dpy);
   AtomWMName = XInternAtom(dpy, "WM_NAME", 0);
-
   createdrw(config);
   createbar(&config->barConfig);
 
-  XSelectInput(dpy, bar.xwindow, ExposureMask | ButtonPressMask);
-  xsetatoms(&config->barConfig);
-  XMapWindow(dpy, bar.xwindow);
-}
-
-void xsetatoms(const BarConfig *barConfig) {
-  long barheight =
-      bar.window_g.h + barConfig->margin.top + barConfig->margin.bottom;
-  long top = barConfig->topbar ? barheight : 0;
-  long bottom = !barConfig->topbar ? barheight : 0;
-  /* left, right, top, bottom, left_start_y, left_end_y, right_start_y,
-   * right_end_y, top_start_x, top_end_x, bottom_start_x, bottom_end_x */
-  long strut[12] = {0, 0, top, bottom, 0, 0, 0, 0, 0, 0, 0, 0};
-
+  long barheight = bar.window_g.h + config->barConfig.margin.top +
+                   config->barConfig.margin.bottom;
+  long top = config->barConfig.topbar ? barheight : 0;
+  long bottom = !config->barConfig.topbar ? barheight : 0;
+  long strut[4] = {0, 0, top, bottom};
   XChangeProperty(dpy, bar.xwindow, XInternAtom(dpy, "_NET_WM_STRUT", 0),
-                  XA_CARDINAL, 32, PropModeReplace, (unsigned char *)strut, 4);
-  XChangeProperty(dpy, bar.xwindow,
-                  XInternAtom(dpy, "_NET_WM_STRUT_PARTIAL", 0), XA_CARDINAL, 32,
-                  PropModeReplace, (unsigned char *)strut, 12l);
+                  XA_CARDINAL, 32, PropModeReplace, (uint8_t *)strut, 4l);
 
-  Atom property[2];
-  property[0] = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", 0);
-  property[1] = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", 0);
-  XChangeProperty(dpy, bar.xwindow, property[1], XA_ATOM, 32, PropModeReplace,
-                  (unsigned char *)property, 1l);
+  Atom NetWMDock = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", 0);
+  XChangeProperty(dpy, bar.xwindow, XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", 0),
+                  XA_ATOM, 32, PropModeReplace, (uint8_t *)&NetWMDock,
+                  sizeof(Atom));
+
+  XSetWindowAttributes attrs = {.event_mask = ExposureMask | ButtonPressMask,
+                                .override_redirect = True};
+  XChangeWindowAttributes(dpy, bar.xwindow, CWEventMask | CWOverrideRedirect,
+                          &attrs);
 
   XClassHint *classhint = XAllocClassHint();
   classhint->res_name = NAME;
@@ -160,6 +152,7 @@ void xsetatoms(const BarConfig *barConfig) {
   XSetClassHint(dpy, bar.xwindow, classhint);
   XFree(classhint);
   XStoreName(dpy, bar.xwindow, NAME);
+  XMapWindow(dpy, bar.xwindow);
 }
 
 void xcleanup(void) {

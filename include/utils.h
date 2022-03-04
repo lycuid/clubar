@@ -2,6 +2,7 @@
 #define __UTILS_H__
 
 #include <stdarg.h>
+#include <stdint.h>
 
 #if __has_attribute(always_inline)
 #define __inline __attribute__((always_inline)) inline
@@ -24,14 +25,14 @@ typedef enum { ReadyEvent, DrawEvent, NoActionEvent } BarEvent;
 typedef enum { Stdin, Custom } BlockType;
 
 typedef struct {
-  unsigned int x, y, w, h;
+  uint32_t x, y, w, h;
 } Geometry;
 
 typedef struct {
   int topbar : 1;
   Geometry geometry;
   struct {
-    unsigned int left, right, top, bottom;
+    uint32_t left, right, top, bottom;
   } padding, margin;
   char foreground[16], background[16];
 } BarConfig;
