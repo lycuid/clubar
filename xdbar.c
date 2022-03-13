@@ -9,6 +9,14 @@
 #include <time.h>
 #include <unistd.h>
 
+#ifdef __ENABLE_PLUGIN__xrmconfig__
+#include "include/plugins/xrmconfig.h"
+#endif
+
+#ifdef __ENABLE_PLUGIN__luaconfig__
+#include "include/plugins/luaconfig.h"
+#endif
+
 pthread_t thread_handle;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
@@ -64,13 +72,11 @@ void create_config(Config *config) {
   config->fonts = (char **)fonts;
   config->barConfig = barConfig;
 
-#ifdef Patch_xrmconfig
-#include "include/patches/xrmconfig.h"
+#ifdef __ENABLE_PLUGIN__xrmconfig__
   merge_xrm_config(config);
 #endif
 
-#ifdef Patch_luaconfig
-#include "include/patches/luaconfig.h"
+#ifdef __ENABLE_PLUGIN__luaconfig__
   if (ConfigFile)
     merge_lua_config(ConfigFile, config);
 #endif
