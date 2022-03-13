@@ -9,16 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define Chunk(x_ptr, x_ptr_start, x_ptr_end, xs, nxs)                          \
-  {                                                                            \
-    int size = x_ptr_end - x_ptr_start + 1;                                    \
-    xs = realloc(xs, (nxs + 1) * sizeof(char *));                              \
-    xs[nxs] = malloc(size);                                                    \
-    memcpy(xs[nxs], x_ptr[x_ptr_start], size);                                 \
-    xs[nxs++][size - 1] = 0;                                                   \
-    x_ptr_start = x_ptr_end + 1;                                               \
-  }
-
 void merge_xrm_config(Config *config) {
   char *value;
   XrmValue xrm_value;
@@ -32,17 +22,28 @@ void merge_xrm_config(Config *config) {
   const char *resm = XResourceManagerString(dpy);
   XrmDatabase db = XrmGetStringDatabase(resm);
 
+#define Chunk(x_ptr, x_ptr_start, x_ptr_end, xs, nxs)                          \
+  {                                                                            \
+    int size = x_ptr_end - x_ptr_start + 1;                                    \
+    xs = realloc(xs, (nxs + 1) * sizeof(char *));                              \
+    xs[nxs] = malloc(size);                                                    \
+    memcpy(xs[nxs], x_ptr[x_ptr_start], size);                                 \
+    xs[nxs++][size - 1] = 0;                                                   \
+    x_ptr_start = x_ptr_end + 1;                                               \
+  }
   if (XrmGetResource(db, NAME ".fonts", "*", &value, &xrm_value)) {
     size_t start, current;
     config->fonts = NULL;
     config->nfonts = 0;
-    for (start = 0, current = 0; current < xrm_value.size; ++current) {
+    for (start = current = 0; current < xrm_value.size; ++current) {
       if (xrm_value.addr[current] == ',' && start < current)
         Chunk(&xrm_value.addr, start, current, config->fonts, config->nfonts);
     }
     if (start < current)
-      Chunk(&xrm_value.addr, start, current, config->fonts, config->nfonts);
+      Chunk(&xrm_value.addr, start, xrm_value.size, config->fonts,
+            config->nfonts);
   }
+#undef Chunk
 
   if (XrmGetResource(db, NAME ".barConfig.geometry", "*", &value, &xrm_value))
     if (sscanf(xrm_value.addr, "%u,%u,%u,%u", &barConfig->geometry.x,

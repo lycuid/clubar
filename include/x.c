@@ -4,6 +4,15 @@
 #include <X11/Xutil.h>
 #include <stdint.h>
 
+#define ClearBar(bar, x, y, w, h)                                              \
+  XftDrawRect(bar.canvas, &bar.background, x, y, w, h)
+
+#if __has_attribute(always_inline)
+#define __inline __attribute__((always_inline))
+#else
+#define __inline inline
+#endif
+
 __inline void prepare_stdinblks(const Block[MAX_BLKS], int);
 __inline void prepare_customblks(const Block[MAX_BLKS], int);
 
@@ -27,22 +36,15 @@ struct Draw {
 } drw;
 
 struct Bar {
-  Window xwindow;
+  Window window;
   XftDraw *canvas;
   Geometry window_g, canvas_g;
   XftColor foreground, background;
 } bar;
 
-#define ClearBar(x, y, w, h)                                                   \
-  XftDrawRect(bar.canvas, &bar.background, x, y, w, h)
-
 Display *dpy;
 Window root;
-int scr;
-XEvent e;
-char *wm_name;
-static Atom AtomWMName;
-static int BarExposed = 0;
+static Atom ATOM_WM_NAME;
 
 XftColor *get_cached_color(const char *colorname) {
   ColorCache *cache = drw.colorcache;
@@ -81,6 +83,7 @@ int parse_box_string(const char *val, char color[32]) {
 }
 
 void createdrw(const Config *config) {
+  int scr = DefaultScreen(dpy);
   drw.vis = DefaultVisual(dpy, scr);
   drw.cmap = DefaultColormap(dpy, scr);
 
@@ -95,6 +98,7 @@ void createdrw(const Config *config) {
 
 void createbar(const BarConfig *barConfig) {
   Geometry geometry = barConfig->geometry;
+  ATOM_WM_NAME = XInternAtom(dpy, "WM_NAME", False);
   bar.window_g = (Geometry){geometry.x, geometry.y, geometry.w, geometry.h};
 
   bar.canvas_g.x = barConfig->padding.left;
@@ -104,7 +108,7 @@ void createbar(const BarConfig *barConfig) {
   bar.canvas_g.h =
       bar.window_g.h - barConfig->padding.top - barConfig->padding.bottom;
 
-  bar.xwindow =
+  bar.window =
       XCreateSimpleWindow(dpy, root, bar.window_g.x, bar.window_g.y,
                           bar.window_g.w, bar.window_g.h, 0, 0xffffff, 0);
 
@@ -113,7 +117,7 @@ void createbar(const BarConfig *barConfig) {
   XftColorAllocName(dpy, drw.vis, drw.cmap, barConfig->background,
                     &bar.background);
 
-  bar.canvas = XftDrawCreate(dpy, bar.xwindow, drw.vis, drw.cmap);
+  bar.canvas = XftDrawCreate(dpy, bar.window, drw.vis, drw.cmap);
 }
 
 void xsetup(const Config *config) {
@@ -123,36 +127,38 @@ void xsetup(const Config *config) {
   if ((dpy = XOpenDisplay(NULL)) == NULL)
     die("Cannot open display.\n");
   root = DefaultRootWindow(dpy);
-  scr = DefaultScreen(dpy);
-  AtomWMName = XInternAtom(dpy, "WM_NAME", 0);
+
+  // initialize bar.
   createdrw(config);
   createbar(&config->barConfig);
+
+  // set bar window properties.
+  XSetWindowAttributes attrs = {.event_mask = StructureNotifyMask |
+                                              ExposureMask | ButtonPressMask,
+                                .override_redirect = True};
+  XChangeWindowAttributes(dpy, bar.window, CWEventMask | CWOverrideRedirect,
+                          &attrs);
+
+  Atom NetWMDock = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", 0);
+  XChangeProperty(dpy, bar.window, XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", 0),
+                  XA_ATOM, 32, PropModeReplace, (uint8_t *)&NetWMDock,
+                  sizeof(Atom));
 
   long barheight = bar.window_g.h + config->barConfig.margin.top +
                    config->barConfig.margin.bottom;
   long top = config->barConfig.topbar ? barheight : 0;
   long bottom = !config->barConfig.topbar ? barheight : 0;
   long strut[4] = {0, 0, top, bottom};
-  XChangeProperty(dpy, bar.xwindow, XInternAtom(dpy, "_NET_WM_STRUT", 0),
+  XChangeProperty(dpy, bar.window, XInternAtom(dpy, "_NET_WM_STRUT", 0),
                   XA_CARDINAL, 32, PropModeReplace, (uint8_t *)strut, 4l);
 
-  Atom NetWMDock = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", 0);
-  XChangeProperty(dpy, bar.xwindow, XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", 0),
-                  XA_ATOM, 32, PropModeReplace, (uint8_t *)&NetWMDock,
-                  sizeof(Atom));
-
-  XSetWindowAttributes attrs = {.event_mask = ExposureMask | ButtonPressMask,
-                                .override_redirect = True};
-  XChangeWindowAttributes(dpy, bar.xwindow, CWEventMask | CWOverrideRedirect,
-                          &attrs);
-
+  XStoreName(dpy, bar.window, NAME);
   XClassHint *classhint = XAllocClassHint();
   classhint->res_name = NAME;
   classhint->res_class = NAME;
-  XSetClassHint(dpy, bar.xwindow, classhint);
+  XSetClassHint(dpy, bar.window, classhint);
   XFree(classhint);
-  XStoreName(dpy, bar.xwindow, NAME);
-  XMapWindow(dpy, bar.xwindow);
+  XMapWindow(dpy, bar.window);
 }
 
 void xcleanup(void) {
@@ -196,21 +202,19 @@ void xrenderblks(BlockType blktype, const Block blks[MAX_BLKS], int nblk) {
         int bx = canvas_g->x, by = canvas_g->y, bw = 0, bh = 0;
         if (box->tmod_mask & (1 << mods[e])) {
           switch (mods[e]) {
-          case Top:
-            bx = gi->x, bw = gi->width, bh = size;
-            break;
-          case Bottom:
-            bx = gi->x, by = canvas_g->y + canvas_g->h - size, bw = gi->width,
-            bh = size;
-            break;
           case Left:
             bx = gi->x, bw = size, bh = canvas_g->h;
             break;
           case Right:
             bx = gi->x + gi->width - size, bw = size, bh = canvas_g->h;
             break;
-          default:
+          case Top:
+            bx = gi->x, bw = gi->width, bh = size;
             break;
+          case Bottom: // default.
+          default:
+            bx = gi->x, by = canvas_g->y + canvas_g->h - size, bw = gi->width,
+            bh = size;
           }
           XftColor *rectcolor = get_cached_color(color);
           XftDrawRect(bar.canvas, rectcolor, bx, by, bw, bh);
@@ -219,7 +223,7 @@ void xrenderblks(BlockType blktype, const Block blks[MAX_BLKS], int nblk) {
       box = box->previous;
     }
 
-    fnindex = blk->tags[Fn] != NULL ? atoi(blk->tags[Fn]->val) : 0;
+    fnindex = blk->tags[Fn] != NULL ? atoi(blk->tags[Fn]->val) % drw.nfonts : 0;
     starty = canvas_g->y + (canvas_g->h - drw.fonts[fnindex]->height) / 2 +
              drw.fonts[fnindex]->ascent;
     fg = blk->tags[Fg] != NULL ? get_cached_color(blk->tags[Fg]->val)
@@ -233,16 +237,16 @@ void clearblks(BlockType blktype, int nblks) {
   if (nblks) {
     GlyphInfo *first = &drw.gis[blktype][0],
               *last = &drw.gis[blktype][nblks - 1];
-    ClearBar(first->x, 0, last->x + last->width, bar.window_g.h);
+    ClearBar(bar, first->x, 0, last->x + last->width, bar.window_g.h);
   }
 }
 
-__inline void prepare_stdinblks(const Block blks[MAX_BLKS], int nblks) {
+inline void prepare_stdinblks(const Block blks[MAX_BLKS], int nblks) {
   XGlyphInfo extent;
   int fnindex, startx = 0;
   for (int i = 0; i < nblks; ++i) {
     const Block *blk = &blks[i];
-    fnindex = blk->tags[Fn] ? atoi(blk->tags[Fn]->val) : 0;
+    fnindex = blk->tags[Fn] ? atoi(blk->tags[Fn]->val) % drw.nfonts : 0;
     XftTextExtentsUtf8(dpy, drw.fonts[fnindex], (FcChar8 *)blk->text,
                        blk->ntext, &extent);
 
@@ -252,12 +256,12 @@ __inline void prepare_stdinblks(const Block blks[MAX_BLKS], int nblks) {
   }
 }
 
-__inline void prepare_customblks(const Block blks[MAX_BLKS], int nblks) {
+inline void prepare_customblks(const Block blks[MAX_BLKS], int nblks) {
   XGlyphInfo extent;
   int fnindex, startx = bar.canvas_g.x + bar.canvas_g.w;
   for (int i = nblks - 1; i >= 0; --i) {
     const Block *blk = &blks[i];
-    fnindex = blk->tags[Fn] ? atoi(blk->tags[Fn]->val) : 0;
+    fnindex = blk->tags[Fn] ? atoi(blk->tags[Fn]->val) % drw.nfonts : 0;
     XftTextExtentsUtf8(dpy, drw.fonts[fnindex], (FcChar8 *)blk->text,
                        blk->ntext, &extent);
 
@@ -277,18 +281,6 @@ void renderblks(BlockType blktype, const Block blks[MAX_BLKS], int nblks) {
     break;
   }
   xrenderblks(blktype, blks, nblks);
-}
-
-int onExpose(Block blks[2][MAX_BLKS], int nblks[2]) {
-  ClearBar(0, 0, bar.window_g.w, bar.window_g.h);
-  if (!BarExposed && (BarExposed = 1)) {
-    XSelectInput(dpy, root, PropertyChangeMask);
-    XStoreName(dpy, root, NAME "-" VERSION);
-    return 1;
-  }
-  renderblks(Stdin, blks[Stdin], nblks[Stdin]);
-  renderblks(Custom, blks[Custom], nblks[Custom]);
-  return 0;
 }
 
 void onButtonPress(const XEvent *xe, Block blks[2][MAX_BLKS], int nblks[2]) {
@@ -330,31 +322,43 @@ void onButtonPress(const XEvent *xe, Block blks[2][MAX_BLKS], int nblks[2]) {
   }
 }
 
-int onPropertyNotify(const XEvent *xe, char *name) {
+bool onPropertyNotify(const XEvent *xe, char *name) {
   const XPropertyEvent *e = &xe->xproperty;
-  if (e->window == root && e->atom == AtomWMName) {
-    if (XFetchName(dpy, root, &wm_name) >= 0 && wm_name) {
+  char *wm_name;
+  if (e->window == root && e->atom == ATOM_WM_NAME) {
+    if (XFetchName(dpy, root, &wm_name) && wm_name) {
       strcpy(name, wm_name);
       XFree(wm_name);
-      return 1;
+      return true;
     }
   }
-  return 0;
+  return false;
 }
 
 BarEvent handle_xevent(Block blks[2][MAX_BLKS], int nblks[2],
                        char name[BLOCK_BUF_SIZE]) {
+  XEvent e;
   if (XPending(dpy)) {
     XNextEvent(dpy, &e);
 
     switch (e.type) {
-    // bar window events.
-    case Expose:
-      if (onExpose(blks, nblks))
-        return ReadyEvent;
-      break;
+    case MapNotify:
+      // start watching for property change event on root window, only after the
+      // bar window maps, as program might segfault, if tried to render on
+      // window that is not visible.
+      XSelectInput(dpy, root, PropertyChangeMask);
+      XStoreName(dpy, root, NAME "-" VERSION);
+      return ReadyEvent;
     case ButtonPress:
       onButtonPress(&e, blks, nblks);
+      break;
+    // Reseting the bar on every 'Expose'.
+    // Xft drawable gets cleared, when another window comes on top of it (that
+    // is only if no compositor is running, something like 'picom').
+    case Expose:
+      ClearBar(bar, 0, 0, bar.window_g.w, bar.window_g.h);
+      renderblks(Stdin, blks[Stdin], nblks[Stdin]);
+      renderblks(Custom, blks[Custom], nblks[Custom]);
       break;
 
     // root window events.
@@ -362,7 +366,6 @@ BarEvent handle_xevent(Block blks[2][MAX_BLKS], int nblks[2],
       if (onPropertyNotify(&e, name))
         return DrawEvent;
       break;
-
     default:
       break;
     }
