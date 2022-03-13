@@ -16,7 +16,6 @@ Block Blks[2][MAX_BLKS];
 int NBlks[2] = {0, 0}, RunEventLoop = 1;
 char *ConfigFile = NULL;
 
-BarEvent nextevent(char[BLOCK_BUF_SIZE]);
 void *stdin_handler();
 void create_config();
 void setup(Config *);
@@ -36,29 +35,10 @@ void gracefully_exit();
     pthread_mutex_unlock(&mutex);                                              \
   }
 
-#define ThreadPause()                                                          \
-  {                                                                            \
-    pthread_mutex_lock(&mutex);                                                \
-    pthread_cond_wait(&cond, &mutex);                                          \
-    pthread_mutex_unlock(&mutex);                                              \
-  }
-
-#define ThreadResumeAll()                                                      \
-  {                                                                            \
-    pthread_mutex_lock(&mutex);                                                \
-    pthread_cond_broadcast(&cond);                                             \
-    pthread_mutex_unlock(&mutex);                                              \
-  }
-
-BarEvent nextevent(char string[BLOCK_BUF_SIZE]) {
-  pthread_mutex_lock(&mutex);
-  BarEvent event = xdb_nextevent(Blks, NBlks, string);
-  pthread_mutex_unlock(&mutex);
-  return event;
-}
-
 void *stdin_handler() {
-  ThreadPause();
+  pthread_mutex_lock(&mutex);
+  pthread_cond_wait(&cond, &mutex);
+  pthread_mutex_unlock(&mutex);
 
   ssize_t nbuf;
   size_t size = BLOCK_BUF_SIZE;
@@ -129,11 +109,17 @@ int main(int argc, char **argv) {
   setup(&config);
   struct timespec ts = {.tv_nsec = 1e6 * 25};
 
+  BarEvent event;
   while (RunEventLoop) {
     nanosleep(&ts, NULL);
-    switch (nextevent(customstr)) {
+    pthread_mutex_lock(&mutex);
+    event = xdb_nextevent(Blks, NBlks, customstr);
+    pthread_mutex_unlock(&mutex);
+    switch (event) {
     case ReadyEvent:
-      ThreadResumeAll();
+      pthread_mutex_lock(&mutex);
+      pthread_cond_broadcast(&cond);
+      pthread_mutex_unlock(&mutex);
       break;
     case DrawEvent:
       UpdateBar(Custom, customstr);
@@ -144,6 +130,8 @@ int main(int argc, char **argv) {
   }
 
   // doesn't make any sense to keep the thread running, after event loop stops.
+  // potential corruptions detected by AddressSanitizer, but what the hell, the
+  // program freakin **quits**.
   pthread_cancel(thread_handle);
   xdb_cleanup();
   return 0;

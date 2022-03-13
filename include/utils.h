@@ -4,12 +4,6 @@
 #include <stdarg.h>
 #include <stdint.h>
 
-#if __has_attribute(always_inline)
-#define __inline __attribute__((always_inline)) inline
-#else
-#define __inline inline
-#endif
-
 #define MAX_BLKS (1 << 6)
 #define BLOCK_BUF_SIZE (1 << 10)
 
