@@ -1,5 +1,5 @@
-/* Enable Patch with: `make PATCHES=xrmconfig`
- * This patch enables runtime configuration support using X Resources.
+/* Enable Plugin with: `make PLUGINS=xrmconfig`
+ * This plugin enables runtime configuration support using X Resources.
  * check 'examples' directory for sample configs.
  */
 #include "xrmconfig.h"

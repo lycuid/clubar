@@ -1,5 +1,5 @@
-/* Enable Patch with: `make PATCHES=luaconfig`
- * This patch enables runtime configuration support using lua source code.
+/* Enable Plugin with: `make PLUGINS=luaconfig`
+ * This plugin enables runtime configuration support using lua source code.
  * check 'examples' directory for sample configs.
  */
 #include "luaconfig.h"
