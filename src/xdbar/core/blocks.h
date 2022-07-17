@@ -16,8 +16,8 @@ typedef enum {
   BtnR,
   ScrlU,
   ScrlD,
-  NullKey
-} TagKey;
+  NullTagName
+} TagName;
 
 typedef uint32_t TagModifierMask;
 typedef enum {
@@ -32,7 +32,7 @@ typedef enum {
   NullModifier
 } TagModifier;
 
-static const TagModifier ValidTagModifiers[NullKey][NullModifier] = {
+static const TagModifier ValidTagModifiers[NullTagName][NullModifier] = {
     [Fn]    = {NullModifier},
     [Fg]    = {NullModifier},
     [Bg]    = {NullModifier},
@@ -52,7 +52,7 @@ typedef struct _Tag {
 typedef struct {
   int ntext;
   char text[64];
-  Tag *tags[NullKey];
+  Tag *tags[NullTagName];
 } Block;
 
 int blks_create(const char *, Block *);

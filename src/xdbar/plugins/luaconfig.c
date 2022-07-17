@@ -16,8 +16,8 @@
     lua_pop(L, 1);                                                             \
   }
 
-inline int GetTableAsIntArray(lua_State *L, int index, const char *table,
-                              const char **repr, int *result, int size)
+static inline int GetTableAsIntArray(lua_State *L, int index, const char *table,
+                                     const char **repr, int *result, int size)
 {
   memset(result, 0, size * sizeof(int));
   lua_getfield(L, (index), table);
@@ -29,7 +29,7 @@ inline int GetTableAsIntArray(lua_State *L, int index, const char *table,
   return found;
 }
 
-inline void GetString(lua_State *L, int index, const char *f, char *res)
+static inline void GetString(lua_State *L, int index, const char *f, char *res)
 {
   lua_getfield(L, index, f);
   if (!lua_isnil(L, -1))
@@ -37,7 +37,7 @@ inline void GetString(lua_State *L, int index, const char *f, char *res)
   lua_pop(L, 1);
 }
 
-void load_bar_config(lua_State *L, BarConfig *barConfig)
+static inline void load_bar_config(lua_State *L, BarConfig *barConfig)
 {
   lua_getfield(L, 1, "barConfig");
   int barindex = 2;
@@ -56,9 +56,9 @@ void load_bar_config(lua_State *L, BarConfig *barConfig)
   const char *g_members[4] = {"x", "y", "w", "h"};
   const char *members[4]   = {"left", "right", "top", "bottom"};
 
-  // @TODO: Make sure there are no struct padding bugs during all
-  // the memcpy int_array -> struct.
-  // currently, don't know how struct padding works...but this code works, gl.
+  // @TODO: Make sure there are no struct padding bugs during all the memcpy
+  // int_array -> struct. currently, don't know how struct padding works...but
+  // this code works, gl.
   if (GetTableAsIntArray(L, barindex, "geometry", g_members, ints, size))
     memcpy(&barConfig->geometry, ints, size * sizeof(int));
 
@@ -69,7 +69,7 @@ void load_bar_config(lua_State *L, BarConfig *barConfig)
     memcpy(&barConfig->margin, ints, size * sizeof(int));
 }
 
-void load_font_config(lua_State *L, Config *luaConfig)
+static inline void load_font_config(lua_State *L, Config *luaConfig)
 {
   luaConfig->nfonts = 0;
   lua_getfield(L, 1, "fonts");

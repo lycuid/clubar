@@ -23,14 +23,14 @@ void merge_xrm_config(Config *config)
   const char *resm = XResourceManagerString(dpy);
   XrmDatabase db   = XrmGetStringDatabase(resm);
 
-#define Chunk(x_ptr, x_ptr_start, x_ptr_end, xs, nxs)                          \
+#define Chunk(x_ptr, start, end, xs, nxs)                                      \
   {                                                                            \
-    int size = x_ptr_end - x_ptr_start + 1;                                    \
+    int size = end - start + 1;                                                \
     xs       = realloc(xs, (nxs + 1) * sizeof(char *));                        \
     xs[nxs]  = malloc(size);                                                   \
-    memcpy(xs[nxs], x_ptr[x_ptr_start], size);                                 \
+    memcpy(xs[nxs], x_ptr[start], size);                                       \
     xs[nxs++][size - 1] = 0;                                                   \
-    x_ptr_start         = x_ptr_end + 1;                                       \
+    start               = end + 1;                                             \
   }
   if (XrmGetResource(db, NAME ".fonts", "*", &value, &xrm_value)) {
     size_t start, current;

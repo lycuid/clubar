@@ -1,4 +1,5 @@
 #include "blocks.h"
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -7,11 +8,11 @@
 static inline Tag *mkcopy(Tag *);
 static inline Tag *push(const char *, TagModifierMask, Tag *);
 static inline Tag *pop(Tag *);
-static inline int parsetag(const char *, TagKey *, TagModifierMask *, char *,
-                           int *);
-static inline void createblk(Block *, Tag *[NullKey], const char *, int);
+static inline int parsetag(const char *, TagName *, TagModifierMask *, char *,
+                           bool *);
+static inline void createblk(Block *, Tag *[NullTagName], const char *, int);
 
-static const char *const TagKeyRepr[NullKey] = {
+static const char *const TagNameRepr[NullTagName] = {
     [Fn] = "Fn",     [Fg] = "Fg",       [Bg] = "Bg",
     [Box] = "Box",   [BtnL] = "BtnL",   [BtnM] = "BtnM",
     [BtnR] = "BtnR", [ScrlU] = "ScrlU", [ScrlD] = "ScrlD"};
@@ -51,131 +52,118 @@ static inline Tag *pop(Tag *stale)
   return tag;
 }
 
-static inline int parsetag(const char *text, TagKey *tkey,
-                           TagModifierMask *tmod_mask, char *val, int *closing)
+static inline int parsetag(const char *text, TagName *tag_name,
+                           TagModifierMask *tmod_mask, char *val, bool *closing)
 {
-  int ptr = 0, nstart = strlen(TAG_START), nend = strlen(TAG_END), bufptr = 0;
+  *tag_name = NullTagName, tmod_mask = 0x0, *closing = false;
+  memset(val, 0, sizeof(*val));
+  int cursor = 0, nstart = strlen(TAG_START), nend = strlen(TAG_END),
+      bufcursor = 0;
 
-  if (memcmp(text + ptr, TAG_START, nstart) != 0)
+  if (memcmp(text + cursor, TAG_START, nstart) != 0)
     return 0;
-  ptr += nstart;
-  *closing = text[ptr] == '/' && ptr++;
+  cursor += nstart;
+  *closing = text[cursor] == '/' && cursor++;
 
-  // parse tag key.
-  for (TagKey t = 0; t < NullKey; ++t) {
-    const char *key_repr = TagKeyRepr[t];
-    if (memcmp(text + ptr, key_repr, strlen(key_repr)) == 0) {
-      ptr += strlen(key_repr);
-      *tkey = t;
+  for (TagName t = 0; t < NullTagName; ++t) {
+    const char *name_repr = TagNameRepr[t];
+    if (memcmp(text + cursor, name_repr, strlen(name_repr)) == 0) {
+      cursor += strlen(name_repr);
+      *tag_name = t;
       break;
     }
   }
-  if (*tkey == NullKey)
+  if (*tag_name == NullTagName)
     return 0;
 
   if (!*closing) {
-    // parsing tag modifier.
-    if (text[ptr] == ':' && ptr++) {
-      // atleast one modifier should be parsed after a colon (':').
-      const TagModifier *mods = ValidTagModifiers[*tkey];
+    if (text[cursor] == ':' && cursor++) {
+      const TagModifier *mods = ValidTagModifiers[*tag_name];
       do {
         int e = 0;
         for (; mods[e] != NullModifier; ++e) {
           const char *tmod_repr = TagModifierRepr[mods[e]];
-          if (memcmp(text + ptr, tmod_repr, strlen(tmod_repr)) == 0) {
-            ptr += strlen(tmod_repr);
+          if (memcmp(text + cursor, tmod_repr, strlen(tmod_repr)) == 0) {
+            cursor += strlen(tmod_repr);
             *tmod_mask |= (1 << mods[e]);
             break;
           }
         }
         if (mods[e] == NullModifier)
           return 0;
-        // keep parsing modifiers as long as it ends with pipe ('|').
-      } while (text[ptr] == '|' && ptr++);
+      } while (text[cursor] == '|' && cursor++);
     }
-
-    if (text[ptr++] != '=')
+    if (text[cursor++] != '=')
       return 0;
-    // parse tag value.
-    while (text[ptr] != TAG_END[0])
-      val[bufptr++] = text[ptr++];
+    while (text[cursor] != TAG_END[0])
+      val[bufcursor++] = text[cursor++];
   }
 
-  if (memcmp(text + ptr, TAG_END, nend) != 0)
+  if (memcmp(text + cursor, TAG_END, nend) != 0)
     return 0;
 
-  return ptr + nend - 1;
+  return cursor + nend - 1;
 }
 
-static inline void createblk(Block *blk, Tag *tags[NullKey], const char *text,
-                             int ntext)
+static inline void createblk(Block *blk, Tag *tags[NullTagName],
+                             const char *text, int ntext)
 {
   blk->ntext = ntext;
   memcpy(blk->text, text, ntext);
 
-  for (int i = 0; i < NullKey; ++i)
+  for (int i = 0; i < NullTagName; ++i)
     blk->tags[i] = mkcopy(tags[i]);
 }
 
 int blks_create(const char *name, Block *blks)
 {
-#define Cur 0
-#define New 1
-  int len = strlen(name), nblks = 0, nbuf = 0, ptr, tagclose;
+  int len = strlen(name), nblks = 0, nbuf = 0, cursor;
+  bool tagclose;
   char buf[len], val[len];
-  TagKey tkey;
+  TagName tag_name;
   TagModifierMask tmod_mask;
 
-  Tag *tagstate[2][NullKey];
-  for (TagKey tag = 0; tag < NullKey; ++tag)
-    tagstate[Cur][tag] = tagstate[New][tag] = NULL;
+  enum { Previous, Current };
+  Tag *tags[2][NullTagName];
+  for (TagName name = 0; name != NullTagName; ++name)
+    tags[Previous][name] = tags[Current][name] = NULL;
 
-  for (ptr = 0; ptr < len; ++ptr) {
-    if (name[ptr] == TAG_START[0]) {
-      tkey = NullKey, tmod_mask = 0x0, tagclose = 0;
-      memset(val, 0, sizeof(val));
-      int size = parsetag(name + ptr, &tkey, &tmod_mask, val, &tagclose);
-      // check for 'out of place' closing tag (closing tag without
-      // corresponding opening tag).
-      int oop = tagclose && tagstate[New][tkey] == NULL;
+  for (cursor = 0; cursor < len; ++cursor) {
+    if (name[cursor] == TAG_START[0]) {
+      int size = parsetag(name + cursor, &tag_name, &tmod_mask, val, &tagclose);
+      // check for out of place closing tag (closing tag without corresponding
+      // opening tag).
+      bool invalid = tagclose && tags[Current][tag_name] == NULL;
       // tag parse success check.
-      if (size > 0 && tkey != NullKey && !oop) {
-        tagstate[New][tkey] = tagclose
-                                  ? pop(tagstate[New][tkey])
-                                  : push(val, tmod_mask, tagstate[New][tkey]);
-        // only creating a new block, if text is not empty as blocks with
-        // empty text doesn't get rendered and that block becomes essentially
-        // useless (very tiny memory/speed optimization).
+      if (size > 0 && tag_name != NullTagName && !invalid) {
+        tags[Current][tag_name] =
+            tagclose ? pop(tags[Current][tag_name])
+                     : push(val, tmod_mask, tags[Current][tag_name]);
         if (nbuf)
-          createblk(&blks[nblks++], tagstate[Cur], buf, nbuf);
+          createblk(&blks[nblks++], tags[Previous], buf, nbuf);
 
-        ptr += size;
-        // State Update: copy 'New' tagstate to 'Cur' tagstate.
-        FreeTags(tagstate[Cur][tkey]);
-        tagstate[Cur][tkey] = mkcopy(tagstate[New][tkey]);
-        // reset temp value buffer and continue loop, once state is updated.
+        cursor += size;
+        FreeTags(tags[Previous][tag_name]);
+        tags[Previous][tag_name] = mkcopy(tags[Current][tag_name]);
         memset(buf, nbuf = 0, sizeof(buf));
         continue;
       }
     }
-    buf[nbuf++] = name[ptr];
+    buf[nbuf++] = name[cursor];
   }
-
   if (nbuf)
-    createblk(&blks[nblks++], tagstate[Cur], buf, nbuf);
+    createblk(&blks[nblks++], tags[Previous], buf, nbuf);
 
-  for (int i = 0; i < NullKey; ++i) {
-    FreeTags(tagstate[Cur][i]);
-    FreeTags(tagstate[New][i]);
+  for (TagName name = 0; name < NullTagName; ++name) {
+    FreeTags(tags[Previous][name]);
+    FreeTags(tags[Current][name]);
   }
-#undef Cur
-#undef New
   return nblks;
 }
 
 void blks_free(Block *blks, int nblks)
 {
   for (int b = 0; b < nblks; ++b)
-    for (int i = 0; i < NullKey; ++i)
-      FreeTags(blks[b].tags[i]);
+    for (TagName tag_name = 0; tag_name < NullTagName; ++tag_name)
+      FreeTags(blks[b].tags[tag_name]);
 }

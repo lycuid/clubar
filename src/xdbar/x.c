@@ -284,12 +284,12 @@ static void onButtonPress(const XEvent *xevent, Block blks[2][MAX_BLKS],
                                      : &drw.gis[Custom][i - nblks[Stdin]];
 
     if (e->x >= gi->x && e->x <= gi->x + gi->width) {
-      TagKey tkey = e->button == Button1   ? BtnL
-                    : e->button == Button2 ? BtnM
-                    : e->button == Button3 ? BtnR
-                    : e->button == Button4 ? ScrlU
-                    : e->button == Button5 ? ScrlD
-                                           : NullKey;
+      TagName tag_name = e->button == Button1   ? BtnL
+                         : e->button == Button2 ? BtnM
+                         : e->button == Button3 ? BtnR
+                         : e->button == Button4 ? ScrlU
+                         : e->button == Button5 ? ScrlD
+                                                : NullTagName;
 
       TagModifierMask tmod_mask = 0x0;
       if (e->state & ShiftMask)
@@ -301,8 +301,8 @@ static void onButtonPress(const XEvent *xevent, Block blks[2][MAX_BLKS],
       if (e->state & Mod4Mask)
         tmod_mask |= (1 << Alt);
 
-      if (tkey != NullKey) {
-        Tag *action_tag = blk->tags[tkey];
+      if (tag_name != NullTagName) {
+        Tag *action_tag = blk->tags[tag_name];
         while (action_tag != NULL) {
           if (strlen(action_tag->val) && action_tag->tmod_mask == tmod_mask)
             system(action_tag->val);
@@ -329,7 +329,7 @@ static bool onPropertyNotify(const XEvent *xevent, char *name)
 }
 
 BarEvent xnextevent(Block blks[2][MAX_BLKS], int nblks[2],
-                       char name[BLOCK_BUF_SIZE])
+                    char name[BLOCK_BUF_SIZE])
 {
   XEvent e;
   if (XPending(dpy)) {
