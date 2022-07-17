@@ -1,10 +1,10 @@
-#ifndef __BLOCKS_H__
-#define __BLOCKS_H__
+#ifndef __CORE__BLOCKS_H__
+#define __CORE__BLOCKS_H__
 
 #include <stdint.h>
 
 #define TAG_START "<"
-#define TAG_END ">"
+#define TAG_END   ">"
 
 typedef enum {
   Fn,
@@ -33,13 +33,13 @@ typedef enum {
 } TagModifier;
 
 static const TagModifier ValidTagModifiers[NullKey][NullModifier] = {
-    [Fn] = {NullModifier},
-    [Fg] = {NullModifier},
-    [Bg] = {NullModifier},
-    [Box] = {Left, Right, Top, Bottom, NullModifier},
-    [BtnL] = {Shift, Ctrl, Super, Alt, NullModifier},
-    [BtnM] = {Shift, Ctrl, Super, Alt, NullModifier},
-    [BtnR] = {Shift, Ctrl, Super, Alt, NullModifier},
+    [Fn]    = {NullModifier},
+    [Fg]    = {NullModifier},
+    [Bg]    = {NullModifier},
+    [Box]   = {Left, Right, Top, Bottom, NullModifier},
+    [BtnL]  = {Shift, Ctrl, Super, Alt, NullModifier},
+    [BtnM]  = {Shift, Ctrl, Super, Alt, NullModifier},
+    [BtnR]  = {Shift, Ctrl, Super, Alt, NullModifier},
     [ScrlU] = {Shift, Ctrl, Super, Alt, NullModifier},
     [ScrlD] = {Shift, Ctrl, Super, Alt, NullModifier}};
 

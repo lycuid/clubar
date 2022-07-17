@@ -6,12 +6,12 @@
  * everytime the program runs.
  * Cons: Recompilation is necessary, when updated.
  */
-#include "include/utils.h"
+#include <xdbar/core.h>
 
-static const BarConfig barConfig = {.geometry = {0, 768 - 32, 1366, 32},
-                                    .padding = {0, 0, 0, 0},
-                                    .margin = {0, 0, 0, 0},
-                                    .topbar = 0,
+static const BarConfig barConfig = {.geometry   = {0, 768 - 32, 1366, 32},
+                                    .padding    = {0, 0, 0, 0},
+                                    .margin     = {0, 0, 0, 0},
+                                    .topbar     = 0,
                                     .foreground = "#efefef",
                                     .background = "#090909"};
 

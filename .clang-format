@@ -1,0 +1,5 @@
+---
+AlignConsecutiveAssignments: true
+AlignConsecutiveMacros: true
+BreakBeforeBraces: Linux
+---

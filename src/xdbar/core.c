@@ -1,7 +1,8 @@
-#include "utils.h"
+#include "core.h"
 #include <stdio.h>
 
-void usage(void) {
+void usage(void)
+{
   puts("USAGE: " NAME " [FLAGS|OPTIONS]");
   puts("FLAGS:");
   puts("  -h    print this help message.");

@@ -3,9 +3,11 @@ include config.mk
 $(BIN): $(OBJS)
 	mkdir -p $(@D) && $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-$(ODIR)/%.o: %.c %.h config.h
+$(OBJS): $(IDIR)/config.h
+
+$(ODIR)/%.o: $(IDIR)/%.c $(IDIR)/%.h
 	mkdir -p $(@D) && $(CC) $(CFLAGS) -c -o $@ $<
-$(ODIR)/%.o: %.c config.h
+$(ODIR)/%.o: $(IDIR)/%.c
 	mkdir -p $(@D) && $(CC) $(CFLAGS) -c -o $@ $<
 
 .PHONY: options
@@ -35,3 +37,4 @@ fmt: ; @git ls-files | egrep '\.[ch]$$' | xargs clang-format -i
 clean: ; rm -rf $(BUILD)
 run: $(BIN) ; $(BIN) $(ARGS)
 debug: $(BIN) ; gdb $(BIN)
+compile_flags: ; @echo $(CFLAGS) | tr ' ' '\n' > compile_flags.txt

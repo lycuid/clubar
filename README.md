@@ -76,7 +76,7 @@ sudo make install
 ```
 
 **Available Plugins** 
-(Note: plugins are just space seperated c filenames, from `include/plugins/`,
+(Note: plugins are just space seperated c filenames, from `src/xdbar/plugins/`,
   without file extension.)
 
 - **luaconfig**: runtime config support with lua source file.

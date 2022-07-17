@@ -21,26 +21,29 @@ static const char *const TagModifierRepr[NullModifier] = {
     [Alt] = "Alt",     [Left] = "Left",    [Right] = "Right",
     [Top] = "Top",     [Bottom] = "Bottom"};
 
-static inline Tag *mkcopy(Tag *root) {
+static inline Tag *mkcopy(Tag *root)
+{
   if (root == NULL)
     return NULL;
   Tag *tag = (Tag *)malloc(sizeof(Tag));
   strcpy(tag->val, root->val);
   tag->tmod_mask = root->tmod_mask;
-  tag->previous = mkcopy(root->previous);
+  tag->previous  = mkcopy(root->previous);
   return tag;
 }
 
 static inline Tag *push(const char *val, TagModifierMask tmod_mask,
-                        Tag *previous) {
+                        Tag *previous)
+{
   Tag *tag = (Tag *)malloc(sizeof(Tag));
   strcpy(tag->val, val);
   tag->tmod_mask = tmod_mask;
-  tag->previous = previous;
+  tag->previous  = previous;
   return tag;
 }
 
-static inline Tag *pop(Tag *stale) {
+static inline Tag *pop(Tag *stale)
+{
   if (stale == NULL)
     return NULL;
   Tag *tag = stale->previous;
@@ -49,8 +52,8 @@ static inline Tag *pop(Tag *stale) {
 }
 
 static inline int parsetag(const char *text, TagKey *tkey,
-                           TagModifierMask *tmod_mask, char *val,
-                           int *closing) {
+                           TagModifierMask *tmod_mask, char *val, int *closing)
+{
   int ptr = 0, nstart = strlen(TAG_START), nend = strlen(TAG_END), bufptr = 0;
 
   if (memcmp(text + ptr, TAG_START, nstart) != 0)
@@ -105,7 +108,8 @@ static inline int parsetag(const char *text, TagKey *tkey,
 }
 
 static inline void createblk(Block *blk, Tag *tags[NullKey], const char *text,
-                             int ntext) {
+                             int ntext)
+{
   blk->ntext = ntext;
   memcpy(blk->text, text, ntext);
 
@@ -113,7 +117,8 @@ static inline void createblk(Block *blk, Tag *tags[NullKey], const char *text,
     blk->tags[i] = mkcopy(tags[i]);
 }
 
-int blks_create(const char *name, Block *blks) {
+int blks_create(const char *name, Block *blks)
+{
 #define Cur 0
 #define New 1
   int len = strlen(name), nblks = 0, nbuf = 0, ptr, tagclose;
@@ -168,7 +173,8 @@ int blks_create(const char *name, Block *blks) {
   return nblks;
 }
 
-void blks_free(Block *blks, int nblks) {
+void blks_free(Block *blks, int nblks)
+{
   for (int b = 0; b < nblks; ++b)
     for (int i = 0; i < NullKey; ++i)
       FreeTags(blks[b].tags[i]);

@@ -1,6 +1,4 @@
 #include "config.h"
-#include "include/blocks.h"
-#include "include/x.h"
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
@@ -8,18 +6,22 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <xdbar/core/blocks.h>
+#include <xdbar/x.h>
 
 #ifdef __ENABLE_PLUGIN__xrmconfig__
-#include "include/plugins/xrmconfig.h"
+#include <xdbar/plugins/xrmconfig.h>
 #endif
 #ifdef __ENABLE_PLUGIN__luaconfig__
-#include "include/plugins/luaconfig.h"
+#include <xdbar/plugins/luaconfig.h>
 #endif
 
 #define WithLock(block)                                                        \
-  pthread_mutex_lock(&mutex);                                                  \
-  { block; };                                                                  \
-  pthread_mutex_unlock(&mutex);
+  {                                                                            \
+    pthread_mutex_lock(&mutex);                                                \
+    block;                                                                     \
+    pthread_mutex_unlock(&mutex);                                              \
+  }
 
 #define UpdateBar(blktype, buffer)                                             \
   {                                                                            \
@@ -33,7 +35,7 @@
 
 pthread_t thread_handle;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+pthread_cond_t cond   = PTHREAD_COND_INITIALIZER;
 Block Blks[2][MAX_BLKS];
 int NBlks[2] = {0, 0}, RunEventLoop = 1;
 char *ConfigFile = NULL;
@@ -43,11 +45,12 @@ void create_config();
 void setup(Config *);
 void gracefully_exit();
 
-void *stdin_handler() {
+void *stdin_handler()
+{
   WithLock(pthread_cond_wait(&cond, &mutex));
 
   ssize_t nbuf;
-  size_t size = BLOCK_BUF_SIZE;
+  size_t size    = BLOCK_BUF_SIZE;
   char *stdinstr = malloc(size), previous[size];
   memset(stdinstr, 0, size);
   memset(previous, 0, size);
@@ -66,9 +69,10 @@ void *stdin_handler() {
   pthread_exit(0);
 }
 
-void create_config(Config *config) {
-  config->nfonts = sizeof(fonts) / sizeof(*fonts);
-  config->fonts = (char **)fonts;
+void create_config(Config *config)
+{
+  config->nfonts    = sizeof(fonts) / sizeof(*fonts);
+  config->fonts     = (char **)fonts;
   config->barConfig = barConfig;
 
 #ifdef __ENABLE_PLUGIN__xrmconfig__
@@ -79,7 +83,8 @@ void create_config(Config *config) {
 #endif
 }
 
-void setup(Config *config) {
+void setup(Config *config)
+{
   pthread_create(&thread_handle, NULL, stdin_handler, NULL);
   xdb_setup(config);
   signal(SIGINT, gracefully_exit);
@@ -89,7 +94,8 @@ void setup(Config *config) {
 
 void gracefully_exit() { RunEventLoop = 0; }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
   Config config;
   char arg, customstr[BLOCK_BUF_SIZE];
   while ((arg = getopt(argc, argv, "hvc:")) != -1) {
@@ -128,9 +134,6 @@ int main(int argc, char **argv) {
     }
   }
 
-  // doesn't make any sense to keep the thread running, after event loop stops.
-  // potential corruptions detected by AddressSanitizer, but what the hell, the
-  // program freakin **quits**.
   pthread_cancel(thread_handle);
   xdb_cleanup();
   return 0;

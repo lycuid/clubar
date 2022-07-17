@@ -9,7 +9,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-void merge_xrm_config(Config *config) {
+void merge_xrm_config(Config *config)
+{
   char *value;
   XrmValue xrm_value;
   BarConfig *barConfig = &config->barConfig;
@@ -20,20 +21,20 @@ void merge_xrm_config(Config *config) {
 
   XrmInitialize();
   const char *resm = XResourceManagerString(dpy);
-  XrmDatabase db = XrmGetStringDatabase(resm);
+  XrmDatabase db   = XrmGetStringDatabase(resm);
 
 #define Chunk(x_ptr, x_ptr_start, x_ptr_end, xs, nxs)                          \
   {                                                                            \
     int size = x_ptr_end - x_ptr_start + 1;                                    \
-    xs = realloc(xs, (nxs + 1) * sizeof(char *));                              \
-    xs[nxs] = malloc(size);                                                    \
+    xs       = realloc(xs, (nxs + 1) * sizeof(char *));                        \
+    xs[nxs]  = malloc(size);                                                   \
     memcpy(xs[nxs], x_ptr[x_ptr_start], size);                                 \
     xs[nxs++][size - 1] = 0;                                                   \
-    x_ptr_start = x_ptr_end + 1;                                               \
+    x_ptr_start         = x_ptr_end + 1;                                       \
   }
   if (XrmGetResource(db, NAME ".fonts", "*", &value, &xrm_value)) {
     size_t start, current;
-    config->fonts = NULL;
+    config->fonts  = NULL;
     config->nfonts = 0;
     for (start = current = 0; current < xrm_value.size; ++current) {
       if (xrm_value.addr[current] == ',' && start < current)
