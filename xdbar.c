@@ -12,10 +12,24 @@
 #ifdef __ENABLE_PLUGIN__xrmconfig__
 #include "include/plugins/xrmconfig.h"
 #endif
-
 #ifdef __ENABLE_PLUGIN__luaconfig__
 #include "include/plugins/luaconfig.h"
 #endif
+
+#define WithLock(block)                                                        \
+  pthread_mutex_lock(&mutex);                                                  \
+  { block; };                                                                  \
+  pthread_mutex_unlock(&mutex);
+
+#define UpdateBar(blktype, buffer)                                             \
+  {                                                                            \
+    WithLock(xdb_clear(blktype, NBlks[blktype]));                              \
+                                                                               \
+    blks_free(Blks[blktype], MAX_BLKS);                                        \
+    NBlks[blktype] = blks_create(buffer, Blks[blktype]);                       \
+                                                                               \
+    WithLock(xdb_render(blktype, Blks[blktype], NBlks[blktype]));              \
+  }
 
 pthread_t thread_handle;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -29,24 +43,8 @@ void create_config();
 void setup(Config *);
 void gracefully_exit();
 
-#define UpdateBar(blktype, buffer)                                             \
-  {                                                                            \
-    pthread_mutex_lock(&mutex);                                                \
-    xdb_clearblks(blktype, NBlks[blktype]);                                    \
-    pthread_mutex_unlock(&mutex);                                              \
-                                                                               \
-    freeblks(Blks[blktype], MAX_BLKS);                                         \
-    NBlks[blktype] = createblks(buffer, Blks[blktype]);                        \
-                                                                               \
-    pthread_mutex_lock(&mutex);                                                \
-    xdb_renderblks(blktype, Blks[blktype], NBlks[blktype]);                    \
-    pthread_mutex_unlock(&mutex);                                              \
-  }
-
 void *stdin_handler() {
-  pthread_mutex_lock(&mutex);
-  pthread_cond_wait(&cond, &mutex);
-  pthread_mutex_unlock(&mutex);
+  WithLock(pthread_cond_wait(&cond, &mutex));
 
   ssize_t nbuf;
   size_t size = BLOCK_BUF_SIZE;
@@ -57,6 +55,7 @@ void *stdin_handler() {
   while ((nbuf = getline(&stdinstr, &size, stdin)) > 1) {
     // trim off newline.
     stdinstr[nbuf - 1] = 0;
+    // painting is expensive.
     if (strcmp(previous, stdinstr) == 0)
       continue;
 
@@ -75,10 +74,8 @@ void create_config(Config *config) {
 #ifdef __ENABLE_PLUGIN__xrmconfig__
   merge_xrm_config(config);
 #endif
-
 #ifdef __ENABLE_PLUGIN__luaconfig__
-  if (ConfigFile)
-    merge_lua_config(ConfigFile, config);
+  merge_lua_config(ConfigFile, config);
 #endif
 }
 
@@ -118,19 +115,15 @@ int main(int argc, char **argv) {
   BarEvent event;
   while (RunEventLoop) {
     nanosleep(&ts, NULL);
-    pthread_mutex_lock(&mutex);
-    event = xdb_nextevent(Blks, NBlks, customstr);
-    pthread_mutex_unlock(&mutex);
+    WithLock(event = xdb_nextevent(Blks, NBlks, customstr));
     switch (event) {
     case ReadyEvent:
-      pthread_mutex_lock(&mutex);
-      pthread_cond_broadcast(&cond);
-      pthread_mutex_unlock(&mutex);
+      WithLock(pthread_cond_broadcast(&cond));
       break;
     case DrawEvent:
       UpdateBar(Custom, customstr);
       break;
-    case NoActionEvent:
+    default:
       break;
     }
   }

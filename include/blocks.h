@@ -18,10 +18,6 @@ typedef enum {
   ScrlD,
   NullKey
 } TagKey;
-static const char *const TagKeyRepr[NullKey] = {
-    [Fn] = "Fn",     [Fg] = "Fg",       [Bg] = "Bg",
-    [Box] = "Box",   [BtnL] = "BtnL",   [BtnM] = "BtnM",
-    [BtnR] = "BtnR", [ScrlU] = "ScrlU", [ScrlD] = "ScrlD"};
 
 typedef uint32_t TagModifierMask;
 typedef enum {
@@ -35,10 +31,6 @@ typedef enum {
   Bottom,
   NullModifier
 } TagModifier;
-static const char *const TagModifierRepr[NullModifier] = {
-    [Shift] = "Shift", [Ctrl] = "Ctrl",    [Super] = "Super",
-    [Alt] = "Alt",     [Left] = "Left",    [Right] = "Right",
-    [Top] = "Top",     [Bottom] = "Bottom"};
 
 static const TagModifier ValidTagModifiers[NullKey][NullModifier] = {
     [Fn] = {NullModifier},
@@ -63,14 +55,7 @@ typedef struct {
   Tag *tags[NullKey];
 } Block;
 
-Tag *mkcopy(Tag *);
-Tag *push(const char *, TagModifierMask, Tag *);
-Tag *pop(Tag *);
-int parsetag(const char *, TagKey *, TagModifierMask *, char *, int *);
-void createblk(Block *, Tag *[NullKey], const char *, int);
-
-// public.
-void freeblks(Block *, int);
-int createblks(const char *, Block *);
+int blks_create(const char *, Block *);
+void blks_free(Block *, int);
 
 #endif

@@ -3,9 +3,25 @@
 #include <string.h>
 
 #define FreeTags(tag_ptr) while ((tag_ptr = pop(tag_ptr)))
-enum { Cur, New };
 
-Tag *mkcopy(Tag *root) {
+static inline Tag *mkcopy(Tag *);
+static inline Tag *push(const char *, TagModifierMask, Tag *);
+static inline Tag *pop(Tag *);
+static inline int parsetag(const char *, TagKey *, TagModifierMask *, char *,
+                           int *);
+static inline void createblk(Block *, Tag *[NullKey], const char *, int);
+
+static const char *const TagKeyRepr[NullKey] = {
+    [Fn] = "Fn",     [Fg] = "Fg",       [Bg] = "Bg",
+    [Box] = "Box",   [BtnL] = "BtnL",   [BtnM] = "BtnM",
+    [BtnR] = "BtnR", [ScrlU] = "ScrlU", [ScrlD] = "ScrlD"};
+
+static const char *const TagModifierRepr[NullModifier] = {
+    [Shift] = "Shift", [Ctrl] = "Ctrl",    [Super] = "Super",
+    [Alt] = "Alt",     [Left] = "Left",    [Right] = "Right",
+    [Top] = "Top",     [Bottom] = "Bottom"};
+
+static inline Tag *mkcopy(Tag *root) {
   if (root == NULL)
     return NULL;
   Tag *tag = (Tag *)malloc(sizeof(Tag));
@@ -15,7 +31,8 @@ Tag *mkcopy(Tag *root) {
   return tag;
 }
 
-Tag *push(const char *val, TagModifierMask tmod_mask, Tag *previous) {
+static inline Tag *push(const char *val, TagModifierMask tmod_mask,
+                        Tag *previous) {
   Tag *tag = (Tag *)malloc(sizeof(Tag));
   strcpy(tag->val, val);
   tag->tmod_mask = tmod_mask;
@@ -23,7 +40,7 @@ Tag *push(const char *val, TagModifierMask tmod_mask, Tag *previous) {
   return tag;
 }
 
-Tag *pop(Tag *stale) {
+static inline Tag *pop(Tag *stale) {
   if (stale == NULL)
     return NULL;
   Tag *tag = stale->previous;
@@ -31,8 +48,9 @@ Tag *pop(Tag *stale) {
   return tag;
 }
 
-int parsetag(const char *text, TagKey *tkey, TagModifierMask *tmod_mask,
-             char *val, int *closing) {
+static inline int parsetag(const char *text, TagKey *tkey,
+                           TagModifierMask *tmod_mask, char *val,
+                           int *closing) {
   int ptr = 0, nstart = strlen(TAG_START), nend = strlen(TAG_END), bufptr = 0;
 
   if (memcmp(text + ptr, TAG_START, nstart) != 0)
@@ -86,7 +104,8 @@ int parsetag(const char *text, TagKey *tkey, TagModifierMask *tmod_mask,
   return ptr + nend - 1;
 }
 
-void createblk(Block *blk, Tag *tags[NullKey], const char *text, int ntext) {
+static inline void createblk(Block *blk, Tag *tags[NullKey], const char *text,
+                             int ntext) {
   blk->ntext = ntext;
   memcpy(blk->text, text, ntext);
 
@@ -94,7 +113,9 @@ void createblk(Block *blk, Tag *tags[NullKey], const char *text, int ntext) {
     blk->tags[i] = mkcopy(tags[i]);
 }
 
-int createblks(const char *name, Block *blks) {
+int blks_create(const char *name, Block *blks) {
+#define Cur 0
+#define New 1
   int len = strlen(name), nblks = 0, nbuf = 0, ptr, tagclose;
   char buf[len], val[len];
   TagKey tkey;
@@ -142,11 +163,12 @@ int createblks(const char *name, Block *blks) {
     FreeTags(tagstate[Cur][i]);
     FreeTags(tagstate[New][i]);
   }
-
+#undef Cur
+#undef New
   return nblks;
 }
 
-void freeblks(Block *blks, int nblks) {
+void blks_free(Block *blks, int nblks) {
   for (int b = 0; b < nblks; ++b)
     for (int i = 0; i < NullKey; ++i)
       FreeTags(blks[b].tags[i]);

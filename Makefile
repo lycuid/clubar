@@ -1,44 +1,22 @@
 include config.mk
 
-$(BIN): $(OBJS) | $(BUILDDIR)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $(BIN) $(MAIN) $(OBJS)
+$(BIN): $(OBJS)
+	mkdir -p $(@D) && $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-$(BIN): config.h
-
-%.o: %.c %.h
-%.o: %.c
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(BUILDDIR):
-	mkdir -p $(BUILDDIR)
-
-.PHONY: run
-run: $(BIN)
-	$(BIN) $(ARGS)
-
-.PHONY: debug
-debug: $(BIN)
-	gdb $(BIN)
+$(ODIR)/%.o: %.c %.h config.h
+	mkdir -p $(@D) && $(CC) $(CFLAGS) -c -o $@ $<
+$(ODIR)/%.o: %.c config.h
+	mkdir -p $(@D) && $(CC) $(CFLAGS) -c -o $@ $<
 
 .PHONY: options
 options:
 	@echo "$(NAME) build options:"
 	@echo "CC       = $(CC)"
 	@echo "PKGS     = $(PKGS)"
-	@echo "OBJS     = $(OBJS)"
+	@echo "SRC      = $(SRC)"
 	@echo "LDFLAGS  = $(LDFLAGS)"
 	@echo "CFLAGS   = $(CFLAGS)"
 	@echo "----------------------------------"
-
-.PHONY: clean
-clean:
-	$(RM) $(BIN) $(wildcard $(SRCDIRS:%=%/*.o))
-
-.PHONY: fmt
-fmt:
-	clang-format -i $(MAIN) config.h
-	clang-format -i $(wildcard $(SRCDIRS:%=%/*.c))
-	clang-format -i $(wildcard $(SRCDIRS:%=%/*.h))
 
 .PHONY: install
 install: options $(BIN)
@@ -50,3 +28,10 @@ install: options $(BIN)
 .PHONY: uninstall
 uninstall:
 	$(RM) $(DESTDIR)$(BINPREFIX)/$(NAME)
+
+# misc.
+.PHONY: fmt clean debug run
+fmt: ; @git ls-files | egrep '\.[ch]$$' | xargs clang-format -i
+clean: ; rm -rf $(BUILD)
+run: $(BIN) ; $(BIN) $(ARGS)
+debug: $(BIN) ; gdb $(BIN)

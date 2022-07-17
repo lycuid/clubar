@@ -9,20 +9,19 @@ Populating statusbar is inspired by dwm statusbar's approach of using the root w
 Future Goals: Maybe rewrite in Rust. :pepehands:
 
 - [Description](#description)
+- [Requirements](#requirements)
 - [Build](#build)
-  - [Requirements](#requirements)
-  - [Build and Install](#build-and-install)
 - [Styling text](#styling-text)
 - [Examples](#examples)
 - [Licence](#licence)
 
 Screenshots
 -----------
-![dark.png](https://raw.githubusercontent.com/lycuid/xdbar/master/screenshots/dark.png)
+![dark.png](/screenshots/dark.png)
 
 ----
 
-![light.png](https://raw.githubusercontent.com/lycuid/xdbar/master/screenshots/light.png)
+![light.png](/screenshots/light.png)
 
 Description
 -----------
@@ -51,19 +50,18 @@ while true; do
   sleep(1)
 done
 ```
-
-Build
------
-#### Requirements
+Requirements
+------------
   - gnu make
   - libx11
   - libxft
 
-**Optional Requirements**
+**Optional**
   - pkg-config  (if not installed, update `config.mk` accordingly).
   - lua         (required if using `luaconfig` patch).
 
-#### Build and install
+Build
+-----
 **Default build**
 ```sh
 make
@@ -138,8 +136,8 @@ Examples
 <Fg=#131313> Colored </Fg> text with <Bg=#c6c6c6> background</Bg>.
 ```
 ```xml
-<Box:Bottom=#ffffff:1> underlined </Bottom> text.
-<Box:Top|Bottom|Left|Right=#ffffff:1> Boxed in </Bottom> text.
+<Box:Bottom=#ffffff:1> underlined </Box> text.
+<Box:Top|Bottom|Left|Right=#ffffff:1> Boxed in </Box> text.
 ```
 ```xml
 <BtnL=systemctl reboot> reboot </BtnL>

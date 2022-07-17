@@ -4,17 +4,18 @@
 #include <X11/Xutil.h>
 #include <stdint.h>
 
+static inline XftColor *get_cached_color(const char *);
+static inline int parse_box_string(const char *, char[32]);
+static inline void createdrw(const Config *);
+static inline void createbar(const BarConfig *);
+static inline void prepare_stdinblks(const Block[MAX_BLKS], int);
+static inline void prepare_customblks(const Block[MAX_BLKS], int);
+static void xrenderblks(BlockType, const Block[MAX_BLKS], int);
+static void onButtonPress(const XEvent *, Block[2][MAX_BLKS], int[2]);
+static bool onPropertyNotify(const XEvent *, char *);
+
 #define ClearBar(bar, x, y, w, h)                                              \
   XftDrawRect(bar.canvas, &bar.background, x, y, w, h)
-
-#if __has_attribute(always_inline)
-#define __inline __attribute__((always_inline))
-#else
-#define __inline inline
-#endif
-
-__inline void prepare_stdinblks(const Block[MAX_BLKS], int);
-__inline void prepare_customblks(const Block[MAX_BLKS], int);
 
 typedef struct {
   int x, width;
@@ -26,7 +27,7 @@ typedef struct _ColorCache {
   struct _ColorCache *previous;
 } ColorCache;
 
-struct Draw {
+static struct Draw {
   int nfonts;
   Visual *vis;
   Colormap cmap;
@@ -35,24 +36,21 @@ struct Draw {
   ColorCache *colorcache;
 } drw;
 
-struct Bar {
+static struct Bar {
   Window window;
   XftDraw *canvas;
   Geometry window_g, canvas_g;
   XftColor foreground, background;
 } bar;
 
-Display *dpy;
-Window root;
+static Display *dpy;
+static Window root;
 static Atom ATOM_WM_NAME;
 
-XftColor *get_cached_color(const char *colorname) {
-  ColorCache *cache = drw.colorcache;
-  while (cache != NULL) {
-    if (strcmp(cache->name, colorname) == 0)
-      return &cache->val;
-    cache = cache->previous;
-  }
+static inline XftColor *get_cached_color(const char *colorname) {
+  for (ColorCache *c = drw.colorcache; c != NULL; c = c->previous)
+    if (strcmp(c->name, colorname) == 0)
+      return &c->val;
 
   // @TODO: currently not handling error when allocating colors.
   ColorCache *color = (ColorCache *)malloc(sizeof(ColorCache));
@@ -65,7 +63,7 @@ XftColor *get_cached_color(const char *colorname) {
   return &drw.colorcache->val;
 }
 
-int parse_box_string(const char *val, char color[32]) {
+static inline int parse_box_string(const char *val, char color[32]) {
   int ptr = 0, c = 0, nval = strlen(val), size = 0;
   memset(color, 0, 32);
 
@@ -82,7 +80,7 @@ int parse_box_string(const char *val, char color[32]) {
   return size > 0 ? size : 1;
 }
 
-void createdrw(const Config *config) {
+static inline void createdrw(const Config *config) {
   int scr = DefaultScreen(dpy);
   drw.vis = DefaultVisual(dpy, scr);
   drw.cmap = DefaultColormap(dpy, scr);
@@ -96,7 +94,7 @@ void createdrw(const Config *config) {
   drw.colorcache = NULL;
 }
 
-void createbar(const BarConfig *barConfig) {
+static inline void createbar(const BarConfig *barConfig) {
   Geometry geometry = barConfig->geometry;
   ATOM_WM_NAME = XInternAtom(dpy, "WM_NAME", False);
   bar.window_g = (Geometry){geometry.x, geometry.y, geometry.w, geometry.h};
@@ -120,65 +118,38 @@ void createbar(const BarConfig *barConfig) {
   bar.canvas = XftDrawCreate(dpy, bar.window, drw.vis, drw.cmap);
 }
 
-void xsetup(const Config *config) {
-  for (int i = 0; i < MAX_BLKS; ++i)
-    drw.gis[Stdin][i] = drw.gis[Custom][i] = (GlyphInfo){0, 0};
+static inline void prepare_stdinblks(const Block blks[MAX_BLKS], int nblks) {
+  XGlyphInfo extent;
+  int fnindex, startx = 0;
+  for (int i = 0; i < nblks; ++i) {
+    const Block *blk = &blks[i];
+    fnindex = blk->tags[Fn] ? atoi(blk->tags[Fn]->val) % drw.nfonts : 0;
+    XftTextExtentsUtf8(dpy, drw.fonts[fnindex], (FcChar8 *)blk->text,
+                       blk->ntext, &extent);
 
-  if ((dpy = XOpenDisplay(NULL)) == NULL)
-    die("Cannot open display.\n");
-  root = DefaultRootWindow(dpy);
-
-  // initialize bar.
-  createdrw(config);
-  createbar(&config->barConfig);
-
-  // set bar window properties.
-  XSetWindowAttributes attrs = {.event_mask = StructureNotifyMask |
-                                              ExposureMask | ButtonPressMask,
-                                .override_redirect = True};
-  XChangeWindowAttributes(dpy, bar.window, CWEventMask | CWOverrideRedirect,
-                          &attrs);
-
-  Atom NetWMDock = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", 0);
-  XChangeProperty(dpy, bar.window, XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", 0),
-                  XA_ATOM, 32, PropModeReplace, (uint8_t *)&NetWMDock,
-                  sizeof(Atom));
-
-  long barheight = bar.window_g.h + config->barConfig.margin.top +
-                   config->barConfig.margin.bottom;
-  long top = config->barConfig.topbar ? barheight : 0;
-  long bottom = !config->barConfig.topbar ? barheight : 0;
-  long strut[4] = {0, 0, top, bottom};
-  XChangeProperty(dpy, bar.window, XInternAtom(dpy, "_NET_WM_STRUT", 0),
-                  XA_CARDINAL, 32, PropModeReplace, (uint8_t *)strut, 4l);
-
-  XStoreName(dpy, bar.window, NAME);
-  XClassHint *classhint = XAllocClassHint();
-  classhint->res_name = NAME;
-  classhint->res_class = NAME;
-  XSetClassHint(dpy, bar.window, classhint);
-  XFree(classhint);
-  XMapWindow(dpy, bar.window);
-}
-
-void xcleanup(void) {
-  while (drw.colorcache != NULL) {
-    XftColorFree(dpy, drw.vis, drw.cmap, &drw.colorcache->val);
-    ColorCache *stale = drw.colorcache;
-    drw.colorcache = drw.colorcache->previous;
-    free(stale);
+    drw.gis[Stdin][i].width = extent.xOff;
+    drw.gis[Stdin][i].x = startx + extent.x;
+    startx += drw.gis[Stdin][i].width;
   }
-
-  for (int fn = 0; fn < drw.nfonts; ++fn)
-    XftFontClose(dpy, drw.fonts[fn]);
-
-  XftColorFree(dpy, drw.vis, drw.cmap, &bar.foreground);
-  XftColorFree(dpy, drw.vis, drw.cmap, &bar.background);
-  XftDrawDestroy(bar.canvas);
-  XCloseDisplay(dpy);
 }
 
-void xrenderblks(BlockType blktype, const Block blks[MAX_BLKS], int nblk) {
+static inline void prepare_customblks(const Block blks[MAX_BLKS], int nblks) {
+  XGlyphInfo extent;
+  int fnindex, startx = bar.canvas_g.x + bar.canvas_g.w;
+  for (int i = nblks - 1; i >= 0; --i) {
+    const Block *blk = &blks[i];
+    fnindex = blk->tags[Fn] ? atoi(blk->tags[Fn]->val) % drw.nfonts : 0;
+    XftTextExtentsUtf8(dpy, drw.fonts[fnindex], (FcChar8 *)blk->text,
+                       blk->ntext, &extent);
+
+    drw.gis[Custom][i].width = extent.xOff;
+    startx -= extent.x + extent.xOff;
+    drw.gis[Custom][i].x = startx;
+  }
+}
+
+static void xrenderblks(BlockType blktype, const Block blks[MAX_BLKS],
+                        int nblk) {
   int starty, size, fnindex;
   char color[32];
   XftColor *fg;
@@ -233,7 +204,47 @@ void xrenderblks(BlockType blktype, const Block blks[MAX_BLKS], int nblk) {
   }
 }
 
-void clearblks(BlockType blktype, int nblks) {
+void xsetup(const Config *config) {
+  for (int i = 0; i < MAX_BLKS; ++i)
+    drw.gis[Stdin][i] = drw.gis[Custom][i] = (GlyphInfo){0, 0};
+
+  if ((dpy = XOpenDisplay(NULL)) == NULL)
+    die("Cannot open display.\n");
+  root = DefaultRootWindow(dpy);
+
+  // initialize bar.
+  createdrw(config);
+  createbar(&config->barConfig);
+
+  // set bar window properties.
+  XSetWindowAttributes attrs = {.event_mask = StructureNotifyMask |
+                                              ExposureMask | ButtonPressMask,
+                                .override_redirect = True};
+  XChangeWindowAttributes(dpy, bar.window, CWEventMask | CWOverrideRedirect,
+                          &attrs);
+
+  Atom NetWMDock = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", 0);
+  XChangeProperty(dpy, bar.window, XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", 0),
+                  XA_ATOM, 32, PropModeReplace, (uint8_t *)&NetWMDock,
+                  sizeof(Atom));
+
+  long barheight = bar.window_g.h + config->barConfig.margin.top +
+                   config->barConfig.margin.bottom;
+  long strut[4] = {0, 0, config->barConfig.topbar ? barheight : 0,
+                   !config->barConfig.topbar ? barheight : 0};
+  XChangeProperty(dpy, bar.window, XInternAtom(dpy, "_NET_WM_STRUT", 0),
+                  XA_CARDINAL, 32, PropModeReplace, (uint8_t *)strut, 4l);
+
+  XStoreName(dpy, bar.window, NAME);
+  XClassHint *classhint = XAllocClassHint();
+  classhint->res_name = NAME;
+  classhint->res_class = NAME;
+  XSetClassHint(dpy, bar.window, classhint);
+  XFree(classhint);
+  XMapWindow(dpy, bar.window);
+}
+
+void clear(BlockType blktype, int nblks) {
   if (nblks) {
     GlyphInfo *first = &drw.gis[blktype][0],
               *last = &drw.gis[blktype][nblks - 1];
@@ -241,37 +252,7 @@ void clearblks(BlockType blktype, int nblks) {
   }
 }
 
-inline void prepare_stdinblks(const Block blks[MAX_BLKS], int nblks) {
-  XGlyphInfo extent;
-  int fnindex, startx = 0;
-  for (int i = 0; i < nblks; ++i) {
-    const Block *blk = &blks[i];
-    fnindex = blk->tags[Fn] ? atoi(blk->tags[Fn]->val) % drw.nfonts : 0;
-    XftTextExtentsUtf8(dpy, drw.fonts[fnindex], (FcChar8 *)blk->text,
-                       blk->ntext, &extent);
-
-    drw.gis[Stdin][i].width = extent.xOff;
-    drw.gis[Stdin][i].x = startx + extent.x;
-    startx += drw.gis[Stdin][i].width;
-  }
-}
-
-inline void prepare_customblks(const Block blks[MAX_BLKS], int nblks) {
-  XGlyphInfo extent;
-  int fnindex, startx = bar.canvas_g.x + bar.canvas_g.w;
-  for (int i = nblks - 1; i >= 0; --i) {
-    const Block *blk = &blks[i];
-    fnindex = blk->tags[Fn] ? atoi(blk->tags[Fn]->val) % drw.nfonts : 0;
-    XftTextExtentsUtf8(dpy, drw.fonts[fnindex], (FcChar8 *)blk->text,
-                       blk->ntext, &extent);
-
-    drw.gis[Custom][i].width = extent.xOff;
-    startx -= extent.x + extent.xOff;
-    drw.gis[Custom][i].x = startx;
-  }
-}
-
-void renderblks(BlockType blktype, const Block blks[MAX_BLKS], int nblks) {
+void render(BlockType blktype, const Block blks[MAX_BLKS], int nblks) {
   switch (blktype) {
   case Stdin:
     prepare_stdinblks(blks, nblks);
@@ -283,8 +264,9 @@ void renderblks(BlockType blktype, const Block blks[MAX_BLKS], int nblks) {
   xrenderblks(blktype, blks, nblks);
 }
 
-void onButtonPress(const XEvent *xe, Block blks[2][MAX_BLKS], int nblks[2]) {
-  const XButtonEvent *e = &xe->xbutton;
+static void onButtonPress(const XEvent *xevent, Block blks[2][MAX_BLKS],
+                          int nblks[2]) {
+  const XButtonEvent *e = &xevent->xbutton;
   for (int i = 0; i < nblks[Stdin] + nblks[Custom]; ++i) {
     Block *blk =
         i < nblks[Stdin] ? &blks[Stdin][i] : &blks[Custom][i - nblks[Stdin]];
@@ -322,8 +304,8 @@ void onButtonPress(const XEvent *xe, Block blks[2][MAX_BLKS], int nblks[2]) {
   }
 }
 
-bool onPropertyNotify(const XEvent *xe, char *name) {
-  const XPropertyEvent *e = &xe->xproperty;
+static bool onPropertyNotify(const XEvent *xevent, char *name) {
+  const XPropertyEvent *e = &xevent->xproperty;
   char *wm_name;
   if (e->window == root && e->atom == ATOM_WM_NAME) {
     if (XFetchName(dpy, root, &wm_name) && wm_name) {
@@ -357,8 +339,8 @@ BarEvent handle_xevent(Block blks[2][MAX_BLKS], int nblks[2],
     // is only if no compositor is running, something like 'picom').
     case Expose:
       ClearBar(bar, 0, 0, bar.window_g.w, bar.window_g.h);
-      renderblks(Stdin, blks[Stdin], nblks[Stdin]);
-      renderblks(Custom, blks[Custom], nblks[Custom]);
+      render(Stdin, blks[Stdin], nblks[Stdin]);
+      render(Custom, blks[Custom], nblks[Custom]);
       break;
 
     // root window events.
@@ -366,9 +348,24 @@ BarEvent handle_xevent(Block blks[2][MAX_BLKS], int nblks[2],
       if (onPropertyNotify(&e, name))
         return DrawEvent;
       break;
-    default:
-      break;
     }
   }
   return NoActionEvent;
+}
+
+void xcleanup(void) {
+  while (drw.colorcache != NULL) {
+    XftColorFree(dpy, drw.vis, drw.cmap, &drw.colorcache->val);
+    ColorCache *stale = drw.colorcache;
+    drw.colorcache = drw.colorcache->previous;
+    free(stale);
+  }
+
+  for (int fn = 0; fn < drw.nfonts; ++fn)
+    XftFontClose(dpy, drw.fonts[fn]);
+
+  XftColorFree(dpy, drw.vis, drw.cmap, &bar.foreground);
+  XftColorFree(dpy, drw.vis, drw.cmap, &bar.background);
+  XftDrawDestroy(bar.canvas);
+  XCloseDisplay(dpy);
 }
