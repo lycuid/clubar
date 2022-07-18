@@ -175,7 +175,7 @@ static void xrenderblks(BlockType blktype, const Block blks[MAX_BLKS], int nblk)
       if (!(size = parse_box_string(box->val, color)))
         continue;
       const TagModifier *mods = ValidTagModifiers[Box];
-      for (int e = 0; mods[e] != NullModifier; ++e) {
+      for (int e = 0; mods[e] != NullTagModifier; ++e) {
         int bx = canvas_g->x, by = canvas_g->y, bw = 0, bh = 0;
         if (box->tmod_mask & (1 << mods[e])) {
           switch (mods[e]) {

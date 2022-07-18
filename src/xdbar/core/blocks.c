@@ -12,15 +12,15 @@ static inline int parsetag(const char *, TagName *, TagModifierMask *, char *,
                            bool *);
 static inline void createblk(Block *, Tag *[NullTagName], const char *, int);
 
+#define REPR(token) [token] = #token
 static const char *const TagNameRepr[NullTagName] = {
-    [Fn] = "Fn",     [Fg] = "Fg",       [Bg] = "Bg",
-    [Box] = "Box",   [BtnL] = "BtnL",   [BtnM] = "BtnM",
-    [BtnR] = "BtnR", [ScrlU] = "ScrlU", [ScrlD] = "ScrlD"};
+    REPR(Fn),   REPR(Fg),   REPR(Bg),    REPR(Box),  REPR(BtnL),
+    REPR(BtnM), REPR(BtnR), REPR(ScrlU), REPR(ScrlD)};
 
-static const char *const TagModifierRepr[NullModifier] = {
-    [Shift] = "Shift", [Ctrl] = "Ctrl",    [Super] = "Super",
-    [Alt] = "Alt",     [Left] = "Left",    [Right] = "Right",
-    [Top] = "Top",     [Bottom] = "Bottom"};
+static const char *const TagModifierRepr[NullTagModifier] = {
+    REPR(Shift), REPR(Ctrl),  REPR(Super), REPR(Alt),
+    REPR(Left),  REPR(Right), REPR(Top),   REPR(Bottom)};
+#undef REPR
 
 static inline Tag *mkcopy(Tag *root)
 {
@@ -55,16 +55,17 @@ static inline Tag *pop(Tag *stale)
 static inline int parsetag(const char *text, TagName *tag_name,
                            TagModifierMask *tmod_mask, char *val, bool *closing)
 {
-  *tag_name = NullTagName, tmod_mask = 0x0, *closing = false;
-  memset(val, 0, sizeof(*val));
+  *tag_name = NullTagName, *tmod_mask = 0x0, *closing = false;
   int cursor = 0, nstart = strlen(TAG_START), nend = strlen(TAG_END),
       bufcursor = 0;
 
+  // parse tag start.
   if (memcmp(text + cursor, TAG_START, nstart) != 0)
     return 0;
   cursor += nstart;
   *closing = text[cursor] == '/' && cursor++;
 
+  // parse tag name.
   for (TagName t = 0; t < NullTagName; ++t) {
     const char *name_repr = TagNameRepr[t];
     if (memcmp(text + cursor, name_repr, strlen(name_repr)) == 0) {
@@ -76,12 +77,13 @@ static inline int parsetag(const char *text, TagName *tag_name,
   if (*tag_name == NullTagName)
     return 0;
 
+  // parse tag modifiers.
   if (!*closing) {
     if (text[cursor] == ':' && cursor++) {
       const TagModifier *mods = ValidTagModifiers[*tag_name];
       do {
         int e = 0;
-        for (; mods[e] != NullModifier; ++e) {
+        for (; mods[e] != NullTagModifier; ++e) {
           const char *tmod_repr = TagModifierRepr[mods[e]];
           if (memcmp(text + cursor, tmod_repr, strlen(tmod_repr)) == 0) {
             cursor += strlen(tmod_repr);
@@ -89,16 +91,18 @@ static inline int parsetag(const char *text, TagName *tag_name,
             break;
           }
         }
-        if (mods[e] == NullModifier)
+        if (mods[e] == NullTagModifier)
           return 0;
       } while (text[cursor] == '|' && cursor++);
     }
+    // parse tag value.
     if (text[cursor++] != '=')
       return 0;
     while (text[cursor] != TAG_END[0])
       val[bufcursor++] = text[cursor++];
   }
 
+  // parse tag end.
   if (memcmp(text + cursor, TAG_END, nend) != 0)
     return 0;
 
@@ -130,6 +134,7 @@ int blks_create(const char *name, Block *blks)
 
   for (cursor = 0; cursor < len; ++cursor) {
     if (name[cursor] == TAG_START[0]) {
+      memset(val, 0, sizeof(val));
       int size = parsetag(name + cursor, &tag_name, &tmod_mask, val, &tagclose);
       // check for out of place closing tag (closing tag without corresponding
       // opening tag).

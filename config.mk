@@ -17,9 +17,8 @@ SRC=$(IDIR)/$(NAME).c             \
 SRC+=$(PLUGINS:%=$(IDIR)/$(NAME)/plugins/%.c)
 OBJS=$(SRC:$(IDIR)/%.c=$(ODIR)/%.o)
 
-ifneq ($(filter luaconfig,$(PLUGINS)),)
-PKGS+=lua
-endif
+PLUGIN_PKGS=$(filter luaconfig,$(PLUGINS))
+PKGS+= $(PLUGIN_PKGS:luaconfig=lua)
 
 FLAGS:=-Wall -Wextra -pedantic -I$(IDIR) -O3 -ggdb -std=c99
 DEFINE:=-DNAME='"$(NAME)"' -DVERSION='"$(VERSION)"' -D_GNU_SOURCE

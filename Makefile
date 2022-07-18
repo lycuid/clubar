@@ -1,5 +1,6 @@
 include config.mk
 
+.PHONY: $(BIN)
 $(BIN): $(OBJS)
 	mkdir -p $(@D) && $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
@@ -15,6 +16,7 @@ options:
 	@echo "$(NAME) build options:"
 	@echo "CC       = $(CC)"
 	@echo "PKGS     = $(PKGS)"
+	@echo "PLUGINS  = $(PLUGINS)"
 	@echo "SRC      = $(SRC)"
 	@echo "LDFLAGS  = $(LDFLAGS)"
 	@echo "CFLAGS   = $(CFLAGS)"

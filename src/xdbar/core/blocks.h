@@ -3,45 +3,54 @@
 
 #include <stdint.h>
 
+/* clang-format off
+ *
+ * <Bg=#efefef>
+ *    <Fg=#090909>
+ *        <Box:Top|Bottom=#00ff00:1> One ring </Box> to rule them all!.
+ *    </Fg>
+ * </Bg>
+ *
+ * blocks = {
+ *    {
+ *       val:  " One ring ",
+ *       tags: {
+ *          [Bg]  => { val: "#efefef", tmod_mask: 0x0, previous: NULL },
+ *          [Fg]  => { val: "#090909", tmod_mask: 0x0, previous: NULL },
+ *          [Box] => { val: "#00ff00", tmod_mask: (1 << Top) | (1 << Bottom), previous: NULL },
+ *       },
+ *    },
+ *    {
+ *       val:  " to rule them all!.",
+ *       tags: {
+ *          [Bg] => { val: "#efefef", previous: NULL },
+ *          [Fg] => { val: "#090909", previous: NULL },
+ *       },
+ *    },
+ * };
+ *
+ * clang-format on */
+
 #define TAG_START "<"
 #define TAG_END   ">"
 
-typedef enum {
-  Fn,
-  Fg,
-  Bg,
-  Box,
-  BtnL,
-  BtnM,
-  BtnR,
-  ScrlU,
-  ScrlD,
-  NullTagName
-} TagName;
+#define Enum(name, ...) typedef enum { __VA_ARGS__, Null##name } name
+
+Enum(TagName, Fn, Fg, Bg, Box, BtnL, BtnM, BtnR, ScrlU, ScrlD);
+Enum(TagModifier, Shift, Ctrl, Super, Alt, Left, Right, Top, Bottom);
 
 typedef uint32_t TagModifierMask;
-typedef enum {
-  Shift,
-  Ctrl,
-  Super,
-  Alt,
-  Left,
-  Right,
-  Top,
-  Bottom,
-  NullModifier
-} TagModifier;
 
-static const TagModifier ValidTagModifiers[NullTagName][NullModifier] = {
-    [Fn]    = {NullModifier},
-    [Fg]    = {NullModifier},
-    [Bg]    = {NullModifier},
-    [Box]   = {Left, Right, Top, Bottom, NullModifier},
-    [BtnL]  = {Shift, Ctrl, Super, Alt, NullModifier},
-    [BtnM]  = {Shift, Ctrl, Super, Alt, NullModifier},
-    [BtnR]  = {Shift, Ctrl, Super, Alt, NullModifier},
-    [ScrlU] = {Shift, Ctrl, Super, Alt, NullModifier},
-    [ScrlD] = {Shift, Ctrl, Super, Alt, NullModifier}};
+static const TagModifier ValidTagModifiers[NullTagName][NullTagModifier] = {
+    [Fn]    = {NullTagModifier},
+    [Fg]    = {NullTagModifier},
+    [Bg]    = {NullTagModifier},
+    [Box]   = {Left, Right, Top, Bottom, NullTagModifier},
+    [BtnL]  = {Shift, Ctrl, Super, Alt, NullTagModifier},
+    [BtnM]  = {Shift, Ctrl, Super, Alt, NullTagModifier},
+    [BtnR]  = {Shift, Ctrl, Super, Alt, NullTagModifier},
+    [ScrlU] = {Shift, Ctrl, Super, Alt, NullTagModifier},
+    [ScrlD] = {Shift, Ctrl, Super, Alt, NullTagModifier}};
 
 typedef struct _Tag {
   TagModifierMask tmod_mask;
@@ -58,4 +67,5 @@ typedef struct {
 int blks_create(const char *, Block *);
 void blks_free(Block *, int);
 
+#undef Enum
 #endif
