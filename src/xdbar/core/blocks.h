@@ -34,10 +34,10 @@
 #define TAG_START "<"
 #define TAG_END   ">"
 
-#define Enum(name, ...) typedef enum { __VA_ARGS__, Null##name } name
-
+#define Enum(indent, ...) typedef enum { __VA_ARGS__, Null##indent } indent
 Enum(TagName, Fn, Fg, Bg, Box, BtnL, BtnM, BtnR, ScrlU, ScrlD);
 Enum(TagModifier, Shift, Ctrl, Super, Alt, Left, Right, Top, Bottom);
+#undef Enum
 
 typedef uint32_t TagModifierMask;
 
@@ -67,5 +67,4 @@ typedef struct {
 int blks_create(const char *, Block *);
 void blks_free(Block *, int);
 
-#undef Enum
 #endif

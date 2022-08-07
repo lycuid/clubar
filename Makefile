@@ -1,6 +1,5 @@
 include config.mk
 
-.PHONY: $(BIN)
 $(BIN): $(OBJS)
 	mkdir -p $(@D) && $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 

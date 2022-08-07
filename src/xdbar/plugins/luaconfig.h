@@ -1,3 +1,3 @@
 #include <xdbar/core.h>
 
-void merge_lua_config(const char *, Config *);
+void luaconfig_merge(const char *, Config *);

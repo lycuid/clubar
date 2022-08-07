@@ -10,8 +10,7 @@
 #define eprintf(...) fprintf(stderr, __VA_ARGS__);
 #define die(...)                                                               \
   {                                                                            \
-    eprintf("[ERROR] ");                                                       \
-    eprintf(__VA_ARGS__);                                                      \
+    eprintf("[ERROR] " __VA_ARGS__);                                           \
     exit(1);                                                                   \
   }
 

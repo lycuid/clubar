@@ -8,7 +8,6 @@
 #include <unistd.h>
 #include <xdbar/core/blocks.h>
 #include <xdbar/x.h>
-
 #ifdef __ENABLE_PLUGIN__xrmconfig__
 #include <xdbar/plugins/xrmconfig.h>
 #endif
@@ -16,7 +15,7 @@
 #include <xdbar/plugins/luaconfig.h>
 #endif
 
-#define WithLock(block)                                                        \
+#define ThreadLocked(block)                                                    \
   {                                                                            \
     pthread_mutex_lock(&mutex);                                                \
     block;                                                                     \
@@ -25,12 +24,12 @@
 
 #define UpdateBar(blktype, buffer)                                             \
   {                                                                            \
-    WithLock(xdb_clear(blktype, NBlks[blktype]));                              \
+    ThreadLocked(xdb_clear(blktype, NBlks[blktype]));                          \
                                                                                \
     blks_free(Blks[blktype], MAX_BLKS);                                        \
     NBlks[blktype] = blks_create(buffer, Blks[blktype]);                       \
                                                                                \
-    WithLock(xdb_render(blktype, Blks[blktype], NBlks[blktype]));              \
+    ThreadLocked(xdb_render(blktype, Blks[blktype], NBlks[blktype]));          \
   }
 
 pthread_t thread_handle;
@@ -41,13 +40,13 @@ int NBlks[2] = {0, 0}, RunEventLoop = 1;
 char *ConfigFile = NULL;
 
 void *stdin_handler();
-void create_config();
-void setup(Config *);
+static inline void create_config(Config *);
+static inline void setup(Config *);
 void gracefully_exit();
 
 void *stdin_handler()
 {
-  WithLock(pthread_cond_wait(&cond, &mutex));
+  ThreadLocked(pthread_cond_wait(&cond, &mutex));
 
   ssize_t nbuf;
   size_t size    = BLOCK_BUF_SIZE;
@@ -69,21 +68,21 @@ void *stdin_handler()
   pthread_exit(0);
 }
 
-void create_config(Config *config)
+static inline void create_config(Config *config)
 {
   config->nfonts    = sizeof(fonts) / sizeof(*fonts);
   config->fonts     = (char **)fonts;
   config->barConfig = barConfig;
 
 #ifdef __ENABLE_PLUGIN__xrmconfig__
-  merge_xrm_config(config);
+  xrmconfig_merge(config);
 #endif
 #ifdef __ENABLE_PLUGIN__luaconfig__
-  merge_lua_config(ConfigFile, config);
+  luaconfig_merge(ConfigFile, config);
 #endif
 }
 
-void setup(Config *config)
+static inline void setup(Config *config)
 {
   pthread_create(&thread_handle, NULL, stdin_handler, NULL);
   xdb_setup(config);
@@ -116,15 +115,15 @@ int main(int argc, char **argv)
 
   create_config(&config);
   setup(&config);
-  struct timespec ts = {.tv_nsec = 1e6 * 25};
 
+  struct timespec ts = {.tv_nsec = 1e6 * 25};
   BarEvent event;
   while (RunEventLoop) {
     nanosleep(&ts, NULL);
-    WithLock(event = xdb_nextevent(Blks, NBlks, customstr));
+    ThreadLocked(event = xdb_nextevent(Blks, NBlks, customstr));
     switch (event) {
     case ReadyEvent:
-      WithLock(pthread_cond_broadcast(&cond));
+      ThreadLocked(pthread_cond_broadcast(&cond));
       break;
     case DrawEvent:
       UpdateBar(Custom, customstr);

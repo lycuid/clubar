@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-void merge_xrm_config(Config *config)
+void xrmconfig_merge(Config *config)
 {
   char *value;
   XrmValue xrm_value;

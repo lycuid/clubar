@@ -5,9 +5,9 @@
 -O3
 -ggdb
 -std=c99
--DNAME="xdbar"
--DVERSION="0.3.2"
 -D_GNU_SOURCE
+-DNAME="xdbar"
+-DVERSION="0.3.3"
 -I/usr/include/freetype2
 -I/usr/include/libpng16
 -I/usr/include/harfbuzz

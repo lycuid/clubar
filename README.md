@@ -8,20 +8,13 @@ Populating statusbar is inspired by dwm statusbar's approach of using the root w
 
 Future Goals: Maybe rewrite in Rust. :pepehands:
 
-- [Description](#description)
-- [Requirements](#requirements)
-- [Build](#build)
-- [Styling text](#styling-text)
-- [Examples](#examples)
-- [Licence](#licence)
-
 Screenshots
 -----------
-![dark.png](/screenshots/dark.png)
+![dark.png](https://raw.githubusercontent.com/lycuid/xdbar/master/screenshots/dark.png)
 
 ----
 
-![light.png](/screenshots/light.png)
+![light.png](https://raw.githubusercontent.com/lycuid/xdbar/master/screenshots/light.png)
 
 Description
 -----------
@@ -76,8 +69,7 @@ sudo make install
 ```
 
 **Available Plugins** 
-(Note: plugins are just space seperated c filenames, from `src/xdbar/plugins/`,
-  without file extension.)
+(Note: plugins are just space seperated c filenames, from [plugins](/src/xdbar/plugins/) directory, without file extension, see [examples](/examples).)
 
 - **luaconfig**: runtime config support with lua source file.
 - **xrmconfig**: runtime config support with X Resources.
@@ -89,51 +81,22 @@ Styling text
 <Tag:Mod1|Mod2|...|Modn=Value> Text </Tag>
 ```
 
-| Tag     | Modifiers                 |
-|---------|---------------------------|
-| Fn      | -                         |
-| Fg      | -                         |
-| Bg      | -                         |
-| Box     | Left, Right, Top, Bottom  |
-| BtnL    | Shift, Ctrl, Super, Alt   |
-| BtnM    | Shift, Ctrl, Super, Alt   |
-| BtnR    | Shift, Ctrl, Super, Alt   |
-| ScrlU   | Shift, Ctrl, Super, Alt   |
-| ScrlD   | Shift, Ctrl, Super, Alt   |
-
-**Valid Values for Tags**
-```xml
-<Fn=Number>
-```
-- `Number` is the index of 'fonts' array in 'config.h'.
-- `fonts[0]` will be used as default font.
-```xml
-<Fg=Color>
-<Bg=Color>
-```
-- `Color` can be any valid color name.  
-  - (eg. `<Fg=black> </Fg>` `<Bg=#000000> </Bg>`)
-```xml
-<Box=Color>
-<Box=Color:Size>
-```
-- `Color` can be any valid color name.
-- `Size` in pixels (if not provided, defaults to 1).  
-  - (eg. `<Box=yellow:2> </Box>` `<Box=#dfdfdf> </Box>`)
-```xml
-<BtnL=Command>
-<BtnM=Command>
-<BtnR=Command>
-<ScrlU=Command>
-<ScrlD=Command>
-```
-- `Command` can be any string. command output/error will not be handled.  
-  - (eg. `<BtnL=systemctl poweroff> </BtnL>` `<BtnR=systemctl reboot> </BtnR>`)
+| Tag     | Modifiers                 | Value       | Description                                       |
+|---------|---------------------------|-------------|---------------------------------------------------|
+| Fn      | -                         | Number      | Index of 'fonts' array from configs (default: 0)  |
+| Fg      | -                         | Color       | Valid color name                                  |
+| Bg      | -                         | Color       | Valid color name                                  |
+| Box     | Left, Right, Top, Bottom  | Color:Size  | valid color name and size (default: 0) in pixels  |
+| BtnL    | Shift, Ctrl, Super, Alt   | Command     | Raw command                                       |
+| BtnM    | Shift, Ctrl, Super, Alt   | Command     | Raw command                                       |
+| BtnR    | Shift, Ctrl, Super, Alt   | Command     | Raw command                                       |
+| ScrlU   | Shift, Ctrl, Super, Alt   | Command     | Raw command                                       |
+| ScrlD   | Shift, Ctrl, Super, Alt   | Command     | Raw command                                       |
 
 Examples
 --------
 ```xml
-<Fg=#131313> Colored </Fg> text with <Bg=#c6c6c6> background</Bg>.
+<Fn=1><Fg=#131313> Colored </Fg> text with <Bg=#c6c6c6> background</Bg></Fn>.
 ```
 ```xml
 <Box:Bottom=#ffffff:1> underlined </Box> text.

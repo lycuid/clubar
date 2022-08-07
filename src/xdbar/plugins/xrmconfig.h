@@ -1,3 +1,3 @@
 #include <xdbar/core.h>
 
-void merge_xrm_config(Config *);
+void xrmconfig_merge(Config *);

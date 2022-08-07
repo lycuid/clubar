@@ -68,14 +68,11 @@ static inline int parse_box_string(const char *val, char color[32])
 {
   int ptr = 0, c = 0, nval = strlen(val), size = 0;
   memset(color, 0, 32);
-
   while (ptr < nval && val[ptr] != ':')
     color[c++] = val[ptr++];
-
   if (val[ptr++] == ':')
     while (ptr < nval && val[ptr] >= '0' && val[ptr] <= '9')
       size = (size * 10) + val[ptr++] - '0';
-
   if (ptr < nval - 1)
     die("Invalid Box template string: %s\n", val);
 
@@ -84,16 +81,12 @@ static inline int parse_box_string(const char *val, char color[32])
 
 static inline void createdrw(const Config *config)
 {
-  int scr  = DefaultScreen(dpy);
-  drw.vis  = DefaultVisual(dpy, scr);
-  drw.cmap = DefaultColormap(dpy, scr);
-
+  drw.vis    = DefaultVisual(dpy, DefaultScreen(dpy));
+  drw.cmap   = DefaultColormap(dpy, DefaultScreen(dpy));
   drw.nfonts = config->nfonts;
-
-  drw.fonts = (XftFont **)malloc(drw.nfonts * sizeof(XftFont *));
+  drw.fonts  = (XftFont **)malloc(drw.nfonts * sizeof(XftFont *));
   for (int i = 0; i < drw.nfonts; ++i)
-    drw.fonts[i] = XftFontOpenName(dpy, scr, config->fonts[i]);
-
+    drw.fonts[i] = XftFontOpenName(dpy, DefaultScreen(dpy), config->fonts[i]);
   drw.colorcache = NULL;
 }
 
@@ -101,24 +94,20 @@ static inline void createbar(const BarConfig *barConfig)
 {
   Geometry geometry = barConfig->geometry;
   ATOM_WM_NAME      = XInternAtom(dpy, "WM_NAME", False);
-  bar.window_g = (Geometry){geometry.x, geometry.y, geometry.w, geometry.h};
-
+  bar.window_g   = (Geometry){geometry.x, geometry.y, geometry.w, geometry.h};
   bar.canvas_g.x = barConfig->padding.left;
   bar.canvas_g.y = barConfig->padding.top;
   bar.canvas_g.w =
       bar.window_g.w - barConfig->padding.left - barConfig->padding.right;
   bar.canvas_g.h =
       bar.window_g.h - barConfig->padding.top - barConfig->padding.bottom;
-
   bar.window =
       XCreateSimpleWindow(dpy, root, bar.window_g.x, bar.window_g.y,
                           bar.window_g.w, bar.window_g.h, 0, 0xffffff, 0);
-
   XftColorAllocName(dpy, drw.vis, drw.cmap, barConfig->foreground,
                     &bar.foreground);
   XftColorAllocName(dpy, drw.vis, drw.cmap, barConfig->background,
                     &bar.background);
-
   bar.canvas = XftDrawCreate(dpy, bar.window, drw.vis, drw.cmap);
 }
 
@@ -131,7 +120,6 @@ static inline void prepare_stdinblks(const Block blks[MAX_BLKS], int nblks)
     fnindex = blk->tags[Fn] ? atoi(blk->tags[Fn]->val) % drw.nfonts : 0;
     XftTextExtentsUtf8(dpy, drw.fonts[fnindex], (FcChar8 *)blk->text,
                        blk->ntext, &extent);
-
     drw.gis[Stdin][i].width = extent.xOff;
     drw.gis[Stdin][i].x     = startx + extent.x;
     startx += drw.gis[Stdin][i].width;
@@ -147,7 +135,6 @@ static inline void prepare_customblks(const Block blks[MAX_BLKS], int nblks)
     fnindex = blk->tags[Fn] ? atoi(blk->tags[Fn]->val) % drw.nfonts : 0;
     XftTextExtentsUtf8(dpy, drw.fonts[fnindex], (FcChar8 *)blk->text,
                        blk->ntext, &extent);
-
     drw.gis[Custom][i].width = extent.xOff;
     startx -= extent.x + extent.xOff;
     drw.gis[Custom][i].x = startx;
@@ -234,7 +221,6 @@ void xsetup(const Config *config)
   XChangeProperty(dpy, bar.window, XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", 0),
                   XA_ATOM, 32, PropModeReplace, (uint8_t *)&NetWMDock,
                   sizeof(Atom));
-
   long barheight = bar.window_g.h + config->barConfig.margin.top +
                    config->barConfig.margin.bottom;
   long strut[4] = {0, 0, config->barConfig.topbar ? barheight : 0,
