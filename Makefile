@@ -1,14 +1,18 @@
 include config.mk
 
-$(BIN): $(OBJS)
-	mkdir -p $(@D) && $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+.PHONY: x11 wayland
+x11: $(OBJS) $(ODIR)/$(NAME)/x.o
+	mkdir -p $(shell dirname $(BIN)) && $(CC) $(CFLAGS) $(LDFLAGS) -o $(BIN) $^
 
-$(OBJS): $(IDIR)/config.h
+# @TODO: Not Implemented.
+wayland: $(OBJS) $(ODIR)/$(NAME)/wayland.o
+	mkdir -p $(shell dirname $(BIN)) && $(CC) $(CFLAGS) $(LDFLAGS) -o $(BIN) $^
 
 $(ODIR)/%.o: $(IDIR)/%.c $(IDIR)/%.h
 	mkdir -p $(@D) && $(CC) $(CFLAGS) -c -o $@ $<
 $(ODIR)/%.o: $(IDIR)/%.c
 	mkdir -p $(@D) && $(CC) $(CFLAGS) -c -o $@ $<
+$(OBJS): $(IDIR)/config.h
 
 .PHONY: options
 options:
@@ -21,14 +25,13 @@ options:
 	@echo "CFLAGS   = $(CFLAGS)"
 	@echo "----------------------------------"
 
-.PHONY: install
+.PHONY: install uninstall
 install: options $(BIN)
 	mkdir -p $(DESTDIR)$(BINPREFIX)
 	strip $(BIN)
 	cp -f $(BIN) $(DESTDIR)$(BINPREFIX)/$(NAME)
 	chmod 755 $(DESTDIR)$(BINPREFIX)/$(NAME)
 
-.PHONY: uninstall
 uninstall:
 	$(RM) $(DESTDIR)$(BINPREFIX)/$(NAME)
 

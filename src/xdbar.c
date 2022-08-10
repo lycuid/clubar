@@ -6,14 +6,8 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <xdbar.h>
 #include <xdbar/core/blocks.h>
-#include <xdbar/x.h>
-#ifdef __ENABLE_PLUGIN__xrmconfig__
-#include <xdbar/plugins/xrmconfig.h>
-#endif
-#ifdef __ENABLE_PLUGIN__luaconfig__
-#include <xdbar/plugins/luaconfig.h>
-#endif
 
 #define ThreadLocked(block)                                                    \
   {                                                                            \
@@ -24,43 +18,28 @@
 
 #define UpdateBar(blktype, buffer)                                             \
   {                                                                            \
-    ThreadLocked(xdb_clear(blktype, NBlks[blktype]));                          \
-                                                                               \
-    blks_free(Blks[blktype], MAX_BLKS);                                        \
-    NBlks[blktype] = blks_create(buffer, Blks[blktype]);                       \
-                                                                               \
-    ThreadLocked(xdb_render(blktype, Blks[blktype], NBlks[blktype]));          \
+    ThreadLocked(xdb_clear(blktype));                                          \
+    core->update_blks(blktype, buffer);                                        \
+    ThreadLocked(xdb_render(blktype));                                         \
   }
 
-pthread_t thread_handle;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond   = PTHREAD_COND_INITIALIZER;
-Block Blks[2][MAX_BLKS];
-int NBlks[2] = {0, 0}, RunEventLoop = 1;
-char *ConfigFile = NULL;
 
-void *stdin_handler();
-static inline void create_config(Config *);
-static inline void setup(Config *);
-void gracefully_exit();
-
-void *stdin_handler()
+void *stdin_thread_handler()
 {
   ThreadLocked(pthread_cond_wait(&cond, &mutex));
-
-  ssize_t nbuf;
   size_t size    = BLOCK_BUF_SIZE;
   char *stdinstr = malloc(size), previous[size];
   memset(stdinstr, 0, size);
   memset(previous, 0, size);
 
-  while ((nbuf = getline(&stdinstr, &size, stdin)) > 1) {
+  for (ssize_t nbuf; (nbuf = getline(&stdinstr, &size, stdin)) > 1;) {
     // trim off newline.
     stdinstr[nbuf - 1] = 0;
     // painting is expensive.
     if (strcmp(previous, stdinstr) == 0)
       continue;
-
     UpdateBar(Stdin, stdinstr);
     memcpy(previous, stdinstr, BLOCK_BUF_SIZE);
     memset(stdinstr, 0, BLOCK_BUF_SIZE);
@@ -68,59 +47,25 @@ void *stdin_handler()
   pthread_exit(0);
 }
 
-static inline void create_config(Config *config)
-{
-  config->nfonts    = sizeof(fonts) / sizeof(*fonts);
-  config->fonts     = (char **)fonts;
-  config->barConfig = barConfig;
-
-#ifdef __ENABLE_PLUGIN__xrmconfig__
-  xrmconfig_merge(config);
-#endif
-#ifdef __ENABLE_PLUGIN__luaconfig__
-  luaconfig_merge(ConfigFile, config);
-#endif
-}
-
-static inline void setup(Config *config)
-{
-  pthread_create(&thread_handle, NULL, stdin_handler, NULL);
-  xdb_setup(config);
-  signal(SIGINT, gracefully_exit);
-  signal(SIGHUP, gracefully_exit);
-  signal(SIGTERM, gracefully_exit);
-}
-
-void gracefully_exit() { RunEventLoop = 0; }
-
 int main(int argc, char **argv)
 {
   Config config;
-  char arg, customstr[BLOCK_BUF_SIZE];
-  while ((arg = getopt(argc, argv, "hvc:")) != -1) {
-    switch (arg) {
-    case 'h':
-      usage();
-      exit(EXIT_SUCCESS);
-    case 'v':
-      puts(NAME ": v" VERSION);
-      exit(EXIT_SUCCESS);
-    case 'c':
-      ConfigFile = optarg;
-      break;
-    default:
-      exit(2);
-    }
-  }
-
-  create_config(&config);
-  setup(&config);
-
+  char customstr[BLOCK_BUF_SIZE];
+  pthread_t stdin_thread;
   struct timespec ts = {.tv_nsec = 1e6 * 25};
   BarEvent event;
-  while (RunEventLoop) {
+
+  core->init(argc, argv, &config);
+  signal(SIGINT, core->stop_running);
+  signal(SIGHUP, core->stop_running);
+  signal(SIGTERM, core->stop_running);
+
+  xdb_setup(&config);
+  pthread_create(&stdin_thread, NULL, stdin_thread_handler, NULL);
+
+  while (core->running) {
     nanosleep(&ts, NULL);
-    ThreadLocked(event = xdb_nextevent(Blks, NBlks, customstr));
+    ThreadLocked(event = xdb_nextevent(customstr));
     switch (event) {
     case ReadyEvent:
       ThreadLocked(pthread_cond_broadcast(&cond));
@@ -133,7 +78,7 @@ int main(int argc, char **argv)
     }
   }
 
-  pthread_cancel(thread_handle);
+  pthread_cancel(stdin_thread);
   xdb_cleanup();
   return 0;
 }

@@ -1,8 +1,8 @@
 NAME:=xdbar
-VERSION:=0.3.3
-BUILD=.build
-ODIR=$(BUILD)/cache
-IDIR=src
+VERSION:=0.3.4
+BUILD:=.build
+ODIR:=$(BUILD)/cache
+IDIR:=src
 BIN:=$(BUILD)/bin/$(NAME)
 PREFIX:=/usr/local
 BINPREFIX:=$(PREFIX)/bin
@@ -12,7 +12,6 @@ PLUGINS=
 SRC=$(IDIR)/$(NAME).c                        \
     $(IDIR)/$(NAME)/core.c                   \
     $(IDIR)/$(NAME)/core/blocks.c            \
-    $(IDIR)/$(NAME)/x.c                      \
     $(PLUGINS:%=$(IDIR)/$(NAME)/plugins/%.c)
 
 OBJS=$(SRC:$(IDIR)/%.c=$(ODIR)/%.o)
