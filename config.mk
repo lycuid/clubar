@@ -4,6 +4,7 @@ BUILD:=.build
 ODIR:=$(BUILD)/cache
 IDIR:=src
 BIN:=$(BUILD)/bin/$(NAME)
+BACKEND:=$(NAME)/backend
 PREFIX:=/usr/local
 BINPREFIX:=$(PREFIX)/bin
 

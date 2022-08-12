@@ -12,10 +12,10 @@ typedef struct {
   int x, width;
 } GlyphInfo;
 
-typedef struct _ColorCache {
+typedef struct ColorCache {
   char name[32];
   XftColor val;
-  struct _ColorCache *previous;
+  struct ColorCache *previous;
 } ColorCache;
 
 static struct Draw {
@@ -47,12 +47,11 @@ static bool onPropertyNotify(const XEvent *, char *);
 static Display *dpy;
 static Atom ATOM_WM_NAME;
 
-#define ClearBar(bar, x, y, w, h)                                              \
-  XftDrawRect(bar.canvas, &bar.background, x, y, w, h)
-#define root (DefaultRootWindow(dpy))
-#define scr  (DefaultScreen(dpy))
-#define vis  (DefaultVisual(dpy, scr))
-#define cmap (DefaultColormap(dpy, scr))
+#define FILL(...) XftDrawRect(bar.canvas, &bar.background, __VA_ARGS__)
+#define root      (DefaultRootWindow(dpy))
+#define scr       (DefaultScreen(dpy))
+#define vis       (DefaultVisual(dpy, scr))
+#define cmap      (DefaultColormap(dpy, scr))
 
 static inline XftColor *get_cached_color(const char *colorname)
 {
@@ -290,7 +289,7 @@ void xdb_clear(BlockType blktype)
   if (core->nblks[blktype]) {
     GlyphInfo *first = &drw.gis[blktype][0],
               *last  = &drw.gis[blktype][core->nblks[blktype] - 1];
-    ClearBar(bar, first->x, 0, last->x + last->width, bar.window_g.h);
+    FILL(first->x, 0, last->x + last->width, bar.window_g.h);
   }
 }
 
@@ -333,7 +332,7 @@ BarEvent xdb_nextevent(char name[BLOCK_BUF_SIZE])
     // Xft drawable gets cleared, when another window comes on top of it (that
     // is only if no compositor is running, something like 'picom').
     case Expose:
-      ClearBar(bar, 0, 0, bar.window_g.w, bar.window_g.h);
+      FILL(0, 0, bar.window_g.w, bar.window_g.h);
       xdb_render(Stdin);
       xdb_render(Custom);
       break;

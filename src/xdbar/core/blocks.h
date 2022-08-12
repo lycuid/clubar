@@ -52,10 +52,10 @@ static const TagModifier ValidTagModifiers[NullTagName][NullTagModifier] = {
     [ScrlU] = {Shift, Ctrl, Super, Alt, NullTagModifier},
     [ScrlD] = {Shift, Ctrl, Super, Alt, NullTagModifier}};
 
-typedef struct _Tag {
+typedef struct Tag {
   TagModifierMask tmod_mask;
   char val[64];
-  struct _Tag *previous;
+  struct Tag *previous;
 } Tag;
 
 typedef struct {

@@ -3,11 +3,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define FreeTags(tag_ptr) while ((tag_ptr = pop(tag_ptr)))
+#define FreeTags(tag_ptr) while ((tag_ptr = tag_pop(tag_ptr)))
 
-static inline Tag *mkcopy(Tag *);
-static inline Tag *push(const char *, TagModifierMask, Tag *);
-static inline Tag *pop(Tag *);
+static inline Tag *tag_clone(Tag *);
+static inline Tag *tag_push(Tag *, const char *, TagModifierMask);
+static inline Tag *tag_pop(Tag *);
 static inline int parsetag(const char *, TagName *, TagModifierMask *, char *,
                            bool *);
 static inline void createblk(Block *, Tag *[NullTagName], const char *, int);
@@ -22,19 +22,19 @@ static const char *const TagModifierRepr[NullTagModifier] = {
     REPR(Left),  REPR(Right), REPR(Top),   REPR(Bottom)};
 #undef REPR
 
-static inline Tag *mkcopy(Tag *root)
+static inline Tag *tag_clone(Tag *root)
 {
   if (root == NULL)
     return NULL;
   Tag *tag = (Tag *)malloc(sizeof(Tag));
   strcpy(tag->val, root->val);
   tag->tmod_mask = root->tmod_mask;
-  tag->previous  = mkcopy(root->previous);
+  tag->previous  = tag_clone(root->previous);
   return tag;
 }
 
-static inline Tag *push(const char *val, TagModifierMask tmod_mask,
-                        Tag *previous)
+static inline Tag *tag_push(Tag *previous, const char *val,
+                            TagModifierMask tmod_mask)
 {
   Tag *tag = (Tag *)malloc(sizeof(Tag));
   strcpy(tag->val, val);
@@ -43,7 +43,7 @@ static inline Tag *push(const char *val, TagModifierMask tmod_mask,
   return tag;
 }
 
-static inline Tag *pop(Tag *stale)
+static inline Tag *tag_pop(Tag *stale)
 {
   if (stale == NULL)
     return NULL;
@@ -116,7 +116,7 @@ static inline void createblk(Block *blk, Tag *tags[NullTagName],
   memcpy(blk->text, text, ntext);
 
   for (int i = 0; i < NullTagName; ++i)
-    blk->tags[i] = mkcopy(tags[i]);
+    blk->tags[i] = tag_clone(tags[i]);
 }
 
 int blks_create(const char *name, Block *blks)
@@ -142,14 +142,15 @@ int blks_create(const char *name, Block *blks)
       // tag parse success check.
       if (size > 0 && tag_name != NullTagName && !invalid) {
         tags[Current][tag_name] =
-            tagclose ? pop(tags[Current][tag_name])
-                     : push(val, tmod_mask, tags[Current][tag_name]);
+            tagclose ? tag_pop(tags[Current][tag_name])
+                     : tag_push(tags[Current][tag_name], val, tmod_mask);
+        // only create block if there is some text in it.
         if (nbuf)
           createblk(&blks[nblks++], tags[Previous], buf, nbuf);
 
         cursor += size;
         FreeTags(tags[Previous][tag_name]);
-        tags[Previous][tag_name] = mkcopy(tags[Current][tag_name]);
+        tags[Previous][tag_name] = tag_clone(tags[Current][tag_name]);
         memset(buf, nbuf = 0, sizeof(buf));
         continue;
       }
