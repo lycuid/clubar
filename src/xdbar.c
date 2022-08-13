@@ -6,7 +6,6 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <xdbar.h>
 #include <xdbar/core/blocks.h>
 
 #define ThreadLocked(block)                                                    \
@@ -30,14 +29,14 @@ void *stdin_thread_handler()
 {
   ThreadLocked(pthread_cond_wait(&cond, &mutex));
   size_t size    = BLOCK_BUF_SIZE;
-  char *stdinstr = malloc(size), previous[size];
+  char *stdinstr = malloc(BLOCK_BUF_SIZE), previous[BLOCK_BUF_SIZE];
   memset(stdinstr, 0, size);
   memset(previous, 0, size);
 
   for (ssize_t nbuf; (nbuf = getline(&stdinstr, &size, stdin)) > 1;) {
     // trim off newline.
     stdinstr[nbuf - 1] = 0;
-    // painting is expensive.
+    // drawing is expensive.
     if (strcmp(previous, stdinstr) == 0)
       continue;
     UpdateBar(Stdin, stdinstr);
@@ -49,18 +48,17 @@ void *stdin_thread_handler()
 
 int main(int argc, char **argv)
 {
-  Config config;
   char customstr[BLOCK_BUF_SIZE];
   pthread_t stdin_thread;
   struct timespec ts = {.tv_nsec = 1e6 * 25};
   BarEvent event;
 
-  core->init(argc, argv, &config);
+  core->init(argc, argv);
   signal(SIGINT, core->stop_running);
   signal(SIGHUP, core->stop_running);
   signal(SIGTERM, core->stop_running);
 
-  xdb_setup(&config);
+  xdb_setup();
   pthread_create(&stdin_thread, NULL, stdin_thread_handler, NULL);
 
   while (core->running) {

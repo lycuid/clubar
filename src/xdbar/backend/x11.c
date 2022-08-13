@@ -4,7 +4,6 @@
 #include <X11/Xutil.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <xdbar.h>
 #include <xdbar/core.h>
 #include <xdbar/core/blocks.h>
 
@@ -249,16 +248,16 @@ static bool onPropertyNotify(const XEvent *xevent, char *name)
   return false;
 }
 
-void xdb_setup(const Config *config)
+void xdb_setup()
 {
   for (int i = 0; i < MAX_BLKS; ++i)
     drw.gis[Stdin][i] = drw.gis[Custom][i] = (GlyphInfo){0, 0};
   if ((dpy = XOpenDisplay(NULL)) == NULL)
     die("Cannot open display.\n");
   // initialize drw.
-  drw_init(config);
+  drw_init(&core->config);
   // initialize bar.
-  bar_init(&config->barConfig);
+  bar_init(&core->config.barConfig);
   // set window properties.
   XSetWindowAttributes attrs = {.event_mask = StructureNotifyMask |
                                               ExposureMask | ButtonPressMask,
@@ -271,10 +270,10 @@ void xdb_setup(const Config *config)
                   XA_ATOM, 32, PropModeReplace, (uint8_t *)&NetWMDock,
                   sizeof(Atom));
   // ewmh: set window struct values.
-  long barheight = bar.window_g.h + config->barConfig.margin.top +
-                   config->barConfig.margin.bottom;
-  long strut[4] = {0, 0, config->barConfig.topbar ? barheight : 0,
-                   !config->barConfig.topbar ? barheight : 0};
+  long barheight = bar.window_g.h + core->config.barConfig.margin.top +
+                   core->config.barConfig.margin.bottom;
+  long strut[4] = {0, 0, core->config.barConfig.topbar ? barheight : 0,
+                   !core->config.barConfig.topbar ? barheight : 0};
   XChangeProperty(dpy, bar.window, XInternAtom(dpy, "_NET_WM_STRUT", 0),
                   XA_CARDINAL, 32, PropModeReplace, (uint8_t *)strut, 4l);
   // set window resource title, class and instance name.

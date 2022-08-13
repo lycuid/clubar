@@ -12,8 +12,8 @@
 #endif
 
 static inline void argparse(int, char *const *);
-static inline void create_config(Config *);
-void core_init(int argc, char *const *argv, Config *);
+static inline void create_config(void);
+void core_init(int argc, char *const *argv);
 void core_update_blks(BlockType, const char *);
 void core_stop_running();
 
@@ -54,23 +54,23 @@ static inline void argparse(int argc, char *const *argv)
   }
 }
 
-static inline void create_config(Config *config)
+static inline void create_config(void)
 {
-  config->nfonts    = sizeof(fonts) / sizeof(*fonts);
-  config->fonts     = (char **)fonts;
-  config->barConfig = barConfig;
+  local.config.nfonts    = sizeof(fonts) / sizeof(*fonts);
+  local.config.fonts     = (char **)fonts;
+  local.config.barConfig = barConfig;
 #ifdef __ENABLE_PLUGIN__xrmconfig__
-  xrmconfig_merge(config);
+  xrmconfig_merge(&local.config);
 #endif
 #ifdef __ENABLE_PLUGIN__luaconfig__
-  luaconfig_merge(ConfigFile, config);
+  luaconfig_merge(ConfigFile, &local.config);
 #endif
 }
 
-void core_init(int argc, char *const *argv, Config *config)
+void core_init(int argc, char *const *argv)
 {
   argparse(argc, argv);
-  create_config(config);
+  create_config();
 }
 
 void core_update_blks(BlockType blktype, const char *buffer)

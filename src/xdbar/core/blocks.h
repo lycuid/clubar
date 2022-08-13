@@ -1,8 +1,3 @@
-#ifndef __CORE__BLOCKS_H__
-#define __CORE__BLOCKS_H__
-
-#include <stdint.h>
-
 /* clang-format off
  *
  * <Bg=#efefef>
@@ -30,6 +25,10 @@
  * };
  *
  * clang-format on */
+#ifndef __CORE__BLOCKS_H__
+#define __CORE__BLOCKS_H__
+
+#include <stdint.h>
 
 #define TAG_START "<"
 #define TAG_END   ">"

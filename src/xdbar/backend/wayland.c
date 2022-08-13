@@ -1,4 +1,3 @@
-#include <xdbar.h>
 #include <xdbar/core.h>
 
 void xdb_setup(const Config *config)
