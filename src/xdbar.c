@@ -28,8 +28,8 @@ pthread_cond_t cond   = PTHREAD_COND_INITIALIZER;
 void *stdin_thread_handler()
 {
   ThreadLocked(pthread_cond_wait(&cond, &mutex));
-  size_t size    = BLOCK_BUF_SIZE;
-  char *stdinstr = malloc(BLOCK_BUF_SIZE), previous[BLOCK_BUF_SIZE];
+  size_t size    = BLK_BUFFER_SIZE;
+  char *stdinstr = malloc(BLK_BUFFER_SIZE), previous[BLK_BUFFER_SIZE];
   memset(stdinstr, 0, size);
   memset(previous, 0, size);
 
@@ -40,15 +40,15 @@ void *stdin_thread_handler()
     if (strcmp(previous, stdinstr) == 0)
       continue;
     UpdateBar(Stdin, stdinstr);
-    memcpy(previous, stdinstr, BLOCK_BUF_SIZE);
-    memset(stdinstr, 0, BLOCK_BUF_SIZE);
+    memcpy(previous, stdinstr, BLK_BUFFER_SIZE);
+    memset(stdinstr, 0, BLK_BUFFER_SIZE);
   }
   pthread_exit(0);
 }
 
 int main(int argc, char **argv)
 {
-  char customstr[BLOCK_BUF_SIZE];
+  char customstr[BLK_BUFFER_SIZE];
   pthread_t stdin_thread;
   struct timespec ts = {.tv_nsec = 1e6 * 25};
   BarEvent event;

@@ -311,7 +311,7 @@ void xdb_render(BlockType blktype)
   }
 }
 
-BarEvent xdb_nextevent(char name[BLOCK_BUF_SIZE])
+BarEvent xdb_nextevent(char name[BLK_BUFFER_SIZE])
 {
   XEvent e;
   if (XPending(dpy)) {

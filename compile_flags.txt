@@ -1,5 +1,6 @@
 -Wall
 -Wextra
+-Wvla
 -pedantic
 -Isrc
 -O3

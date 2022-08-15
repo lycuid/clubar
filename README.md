@@ -40,7 +40,7 @@ Description
 #!/bin/bash
 while true; do
   xsetroot -name "$(whoami)@$(hostname) on $(uname -o) | $(date)"
-  sleep(1)
+  sleep 1
 done
 ```
 Requirements

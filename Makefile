@@ -36,9 +36,10 @@ uninstall:
 	$(RM) $(DESTDIR)$(BINPREFIX)/$(NAME)
 
 # misc.
-.PHONY: fmt clean debug run
-fmt: ; @git ls-files | egrep '\.[ch]$$' | xargs clang-format -i
+.PHONY: clean fmt loc debug run
 clean: ; rm -rf $(BUILD)
+fmt: ; @git ls-files | egrep '\.[ch]$$' | xargs clang-format -i
+loc: ; @git ls-files | egrep '\.[ch]$$' | xargs wc -l
 run: $(BIN) ; $(BIN) $(ARGS)
-debug: $(BIN) ; gdb $(BIN)
+debug: $(BIN) ; @gdb $(BIN)
 compile_flags: ; @echo $(CFLAGS) | tr ' ' '\n' > compile_flags.txt

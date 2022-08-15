@@ -30,8 +30,10 @@
 
 #include <stdint.h>
 
-#define TAG_START "<"
-#define TAG_END   ">"
+#define BLK_BUFFER_SIZE (1 << 10)
+
+static const char *const TagStart = "<";
+static const char *const TagEnd   = ">";
 
 #define Enum(indent, ...) typedef enum { __VA_ARGS__, Null##indent } indent
 Enum(TagName, Fn, Fg, Bg, Box, BtnL, BtnM, BtnR, ScrlU, ScrlD);
@@ -59,7 +61,7 @@ typedef struct Tag {
 
 typedef struct {
   int ntext;
-  char text[64];
+  char text[BLK_BUFFER_SIZE];
   Tag *tags[NullTagName];
 } Block;
 

@@ -8,8 +8,7 @@
 #include <stdlib.h>
 #include <xdbar/core/blocks.h>
 
-#define MAX_BLKS       (1 << 6)
-#define BLOCK_BUF_SIZE (1 << 10)
+#define MAX_BLKS (1 << 6)
 
 #define eprintf(...) fprintf(stderr, __VA_ARGS__);
 #define die(...)                                                               \
@@ -54,7 +53,7 @@ extern const struct Core {
 void xdb_setup(void);
 void xdb_clear(BlockType);
 void xdb_render(BlockType);
-BarEvent xdb_nextevent(char[BLOCK_BUF_SIZE]);
+BarEvent xdb_nextevent(char[BLK_BUFFER_SIZE]);
 void xdb_cleanup(void);
 
 #endif

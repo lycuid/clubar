@@ -1,10 +1,6 @@
 #include <xdbar/core.h>
 
-void xdb_setup(const Config *config)
-{
-  (void)config;
-  die("Wayland currently not supported.\n");
-}
+void xdb_setup(void) { die("Wayland currently not supported.\n"); }
 
 void xdb_clear(BlockType blktype)
 {
@@ -18,7 +14,7 @@ void xdb_render(BlockType blktype)
   die("Wayland currently not supported.\n");
 }
 
-BarEvent xdb_nextevent(char name[BLOCK_BUF_SIZE])
+BarEvent xdb_nextevent(char name[BLK_BUFFER_SIZE])
 {
   (void)name;
   die("Wayland currently not supported.\n");
