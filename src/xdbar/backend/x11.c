@@ -259,9 +259,10 @@ void xdb_setup()
   // initialize bar.
   bar_init(&core->config.barConfig);
   // set window properties.
-  XSetWindowAttributes attrs = {.event_mask = StructureNotifyMask |
-                                              ExposureMask | ButtonPressMask,
-                                .override_redirect = True};
+  XSetWindowAttributes attrs = {
+      .event_mask        = StructureNotifyMask | ExposureMask | ButtonPressMask,
+      .override_redirect = True,
+  };
   XChangeWindowAttributes(dpy, bar.window, CWEventMask | CWOverrideRedirect,
                           &attrs);
   // ewmh: set window type

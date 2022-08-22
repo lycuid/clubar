@@ -10,18 +10,13 @@ typedef struct Parser {
   int cursor;
 } Parser;
 
-#define p_new(buffer)          (Parser){buffer, 0};
-#define p_peek(parser, ch)     ((parser)->buffer[(parser)->cursor] == ch)
-#define p_buffer(parser)       ((parser)->buffer + (parser)->cursor)
-#define p_advance(parser, inc) ((parser)->cursor += inc)
-#define p_consume(parser, ch)  (p_peek(parser, ch) && p_advance(parser, 1))
-static inline bool p_consume_string(Parser *parser, const char *str)
-{
-  for (size_t i = 0; i < strlen(str); ++i)
-    if (!p_consume(parser, str[i]))
-      return false;
-  return true;
-}
+#define p_new(buffer)     (Parser){buffer, 0};
+#define p_peek(p, ch)     ((p)->buffer[(p)->cursor] == ch)
+#define p_buffer(p)       ((p)->buffer + (p)->cursor)
+#define p_advance(p, inc) ((p)->cursor += inc)
+#define p_consume(p, ch)  (p_peek(p, ch) && p_advance(p, 1))
+#define p_consume_string(p, str, len)                                          \
+  (memcmp(str, p_buffer(p), (len)) == 0 && p_advance(p, (len)))
 
 #define REPR(token) [token] = #token
 static const char *const TagNameRepr[NullTagName] = {
@@ -75,12 +70,9 @@ static inline Tag *tag_pop(Tag *stale)
 static inline TagName parse_tagname(Parser *parser)
 {
   for (TagName tag_name = 0; tag_name < NullTagName; ++tag_name) {
-    const char *name_repr = TagNameRepr[tag_name];
-    int len               = strlen(name_repr);
-    if (memcmp(p_buffer(parser), name_repr, len) == 0) {
-      p_advance(parser, len);
+    int len = strlen(TagNameRepr[tag_name]);
+    if (p_consume_string(parser, TagNameRepr[tag_name], len))
       return tag_name;
-    }
   }
   return NullTagName;
 }
@@ -89,12 +81,9 @@ static inline TagModifierMask parse_tagmodifier(Parser *parser, TagName name)
 {
   const TagModifier *mods = ValidTagModifiers[name];
   for (int e = 0; mods[e] != NullTagModifier; ++e) {
-    const char *tmod_repr = TagModifierRepr[mods[e]];
-    int len               = strlen(tmod_repr);
-    if (memcmp(p_buffer(parser), tmod_repr, len) == 0) {
-      p_advance(parser, len);
+    int len = strlen(TagModifierRepr[mods[e]]);
+    if (p_consume_string(parser, TagModifierRepr[mods[e]], len))
       return mods[e];
-    }
   }
   return NullTagModifier;
 }
@@ -104,9 +93,11 @@ int parse(const char *text, TagName *tag_name, TagModifierMask *tmod_mask,
 {
   Parser parser = p_new(text);
   *tag_name = NullTagName, *tmod_mask = 0x0, *closing = false;
+  static const size_t ntag_start = sizeof(TagStart) - 1,
+                      ntag_end   = sizeof(TagEnd) - 1;
 
   // parse tag start.
-  if (!p_consume_string(&parser, TagStart))
+  if (!p_consume_string(&parser, TagStart, ntag_start))
     return 0;
   *closing = p_consume(&parser, '/');
 
@@ -132,7 +123,7 @@ int parse(const char *text, TagName *tag_name, TagModifierMask *tmod_mask,
   }
 
   // parse tag end.
-  if (!p_consume_string(&parser, TagEnd))
+  if (!p_consume_string(&parser, TagEnd, ntag_end))
     return 0;
 
   return parser.cursor - 1;

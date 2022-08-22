@@ -1,10 +1,11 @@
-/* clang-format off
- *
+/*
  * <Bg=#efefef>
  *    <Fg=#090909>
- *        <Box:Top|Bottom=#00ff00:1> One ring </Box> to rule them all!.
+ *        <Box:Top|Bottom=#00ff00:2> One ring </Box> to rule them all!.
  *    </Fg>
  * </Bg>
+ *
+ * ----------------------------------------------------------------------------
  *
  * blocks = {
  *    {
@@ -12,7 +13,11 @@
  *       tags: {
  *          [Bg]  => { val: "#efefef", tmod_mask: 0x0, previous: NULL },
  *          [Fg]  => { val: "#090909", tmod_mask: 0x0, previous: NULL },
- *          [Box] => { val: "#00ff00", tmod_mask: (1 << Top) | (1 << Bottom), previous: NULL },
+ *          [Box] => {
+ *              val: "#00ff00:2",
+ *              tmod_mask: (1 << Top) | (1 << Bottom),
+ *              previous: NULL
+ *          },
  *       },
  *    },
  *    {
@@ -23,17 +28,15 @@
  *       },
  *    },
  * };
- *
- * clang-format on */
+ */
 #ifndef __CORE__BLOCKS_H__
 #define __CORE__BLOCKS_H__
 
 #include <stdint.h>
 
 #define BLK_BUFFER_SIZE (1 << 10)
-
-static const char *const TagStart = "<";
-static const char *const TagEnd   = ">";
+#define TagStart        "<"
+#define TagEnd          ">"
 
 #define Enum(indent, ...) typedef enum { __VA_ARGS__, Null##indent } indent
 Enum(TagName, Fn, Fg, Bg, Box, BtnL, BtnM, BtnR, ScrlU, ScrlD);

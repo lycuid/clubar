@@ -21,9 +21,9 @@ ifneq ($(filter luaconfig,$(PLUGINS)),)
 endif
 
 FLAGS:=-Wall -Wextra -Wvla -pedantic -I$(IDIR) -O3 -ggdb -std=c99
-PREPROC:=-D_GNU_SOURCE            \
-         -DNAME='"$(NAME)"'       \
-         -DVERSION='"$(VERSION)"' \
+PREPROC:=-D_GNU_SOURCE                       \
+         -DNAME='"$(NAME)"'                  \
+         -DVERSION='"$(VERSION)"'            \
          $(PLUGINS:%=-D__ENABLE_PLUGIN__%__)
 
 # In case 'pkg-config' is not installed, update LDFLAGS and CFLAGS accordingly.
