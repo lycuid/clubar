@@ -1,5 +1,5 @@
 NAME:=xdbar
-VERSION:=0.3.4
+VERSION:=0.3.5
 BUILD:=.build
 ODIR:=$(BUILD)/cache
 IDIR:=src

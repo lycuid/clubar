@@ -4,6 +4,7 @@
 #include <X11/Xutil.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <unistd.h>
 #include <xdbar/core.h>
 #include <xdbar/core/blocks.h>
 
@@ -40,6 +41,7 @@ static inline void prepare_customblks(void);
 static inline void xrender_bg(const Block *, const GlyphInfo *);
 static inline void xrender_box(const Block *, const GlyphInfo *);
 static inline void xrender_string(const Block *, const GlyphInfo *);
+static inline void execute_cmd(const char *);
 static void onButtonPress(const XEvent *);
 static bool onPropertyNotify(const XEvent *, char *);
 
@@ -193,6 +195,32 @@ static void xrender_string(const Block *blk, const GlyphInfo *gi)
                     (FcChar8 *)blk->text, blk->ntext);
 }
 
+static inline void execute_cmd(const char *cmd_string)
+{
+  if (fork())
+    return;
+  if (dpy)
+    close(ConnectionNumber(dpy));
+
+  // splitting space seperated cmd into an array.
+  int cursor = 0;
+  char *cmd[50];
+  cmd[0] = calloc(50, sizeof(char));
+  for (size_t i = 0, j = 0; i < strlen(cmd_string); ++i) {
+    if (cmd_string[i] == ' ' && j > 0 && !(j = 0)) {
+      cmd[++cursor] = calloc(50, sizeof(char));
+      continue;
+    }
+    cmd[cursor][j++] = cmd_string[i];
+  }
+  cmd[++cursor] = NULL;
+
+  execvp(cmd[0], (char **)cmd);
+  for (int i = 0; i < cursor; ++i)
+    free(cmd[i]);
+  exit(EXIT_SUCCESS);
+}
+
 static void onButtonPress(const XEvent *xevent)
 {
   const XButtonEvent *e     = &xevent->xbutton;
@@ -228,7 +256,7 @@ static void onButtonPress(const XEvent *xevent)
       if (tag_name != NullTagName)
         for (Tag *tag = blk->tags[tag_name]; tag; tag = tag->previous)
           if (strlen(tag->val) && tag->tmod_mask == tmod_mask)
-            system(tag->val);
+            execute_cmd(tag->val);
       break;
     }
   }
