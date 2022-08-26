@@ -17,6 +17,8 @@ void core_init(int argc, char *const *argv);
 void core_update_blks(BlockType, const char *);
 void core_stop_running();
 
+static Block blks[2][MAX_BLKS];
+
 static struct Core local = {
     .nblks        = {0, 0},
     .running      = 1,
@@ -69,6 +71,8 @@ static inline void create_config(void)
 
 void core_init(int argc, char *const *argv)
 {
+  local.blks[Stdin]  = blks[Stdin];
+  local.blks[Custom] = blks[Custom];
   argparse(argc, argv);
   create_config();
 }

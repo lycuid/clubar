@@ -40,8 +40,8 @@ typedef struct {
 } Config;
 
 extern const struct Core {
-  bool running : 1;
-  Block blks[2][MAX_BLKS];
+  bool running;
+  Block *blks[2];
   int nblks[2];
   Config config;
   void (*init)(int argc, char *const *argv);

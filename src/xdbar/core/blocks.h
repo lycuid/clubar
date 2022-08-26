@@ -58,7 +58,7 @@ static const TagModifier ValidTagModifiers[NullTagName][NullTagModifier] = {
 
 typedef struct Tag {
   TagModifierMask tmod_mask;
-  char val[64];
+  char val[BLK_BUFFER_SIZE];
   struct Tag *previous;
 } Tag;
 
