@@ -340,7 +340,7 @@ void xdb_render(BlockType blktype)
   }
 }
 
-BarEvent xdb_nextevent(char name[BLK_BUFFER_SIZE])
+XDBEvent xdb_nextevent(char name[BLK_BUFFER_SIZE])
 {
   XEvent e;
   if (XPending(dpy)) {
@@ -367,7 +367,7 @@ BarEvent xdb_nextevent(char name[BLK_BUFFER_SIZE])
     // root window events.
     case PropertyNotify:
       if (onPropertyNotify(&e, name))
-        return DrawEvent;
+        return RenderEvent;
       break;
     }
   }

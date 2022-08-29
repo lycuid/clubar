@@ -20,8 +20,8 @@ void core_stop_running();
 static Block blks[2][MAX_BLKS];
 
 static struct Core local = {
+    .running      = true,
     .nblks        = {0, 0},
-    .running      = 1,
     .init         = core_init,
     .update_blks  = core_update_blks,
     .stop_running = core_stop_running,
@@ -83,4 +83,4 @@ void core_update_blks(BlockType blktype, const char *buffer)
   local.nblks[blktype] = blks_create(buffer, local.blks[blktype]);
 }
 
-void core_stop_running() { local.running = 0; }
+void core_stop_running() { local.running = false; }

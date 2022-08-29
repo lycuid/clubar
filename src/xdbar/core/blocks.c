@@ -5,12 +5,12 @@
 
 #define FreeTags(tag_ptr) while ((tag_ptr = tag_pop(tag_ptr)))
 
-typedef struct Parser {
+struct Parser {
   const char *buffer;
   int cursor;
-} Parser;
+};
 
-#define p_new(buffer)     (Parser){buffer, 0};
+#define Parser(text)      (struct Parser){.buffer = text, .cursor = 0};
 #define p_peek(p, ch)     ((p)->buffer[(p)->cursor] == ch)
 #define p_buffer(p)       ((p)->buffer + (p)->cursor)
 #define p_advance(p, inc) ((p)->cursor += inc)
@@ -31,8 +31,8 @@ static const char *const TagModifierRepr[NullTagModifier] = {
 static inline Tag *tag_clone(Tag *);
 static inline Tag *tag_push(Tag *, const char *, TagModifierMask);
 static inline Tag *tag_pop(Tag *);
-static inline TagName parse_tagname(Parser *);
-static inline TagModifierMask parse_tagmodifier(Parser *, TagName);
+static inline TagName parse_tagname(struct Parser *);
+static inline TagModifierMask parse_tagmodifier(struct Parser *, TagName);
 static inline int parse(const char *, TagName *, TagModifierMask *, char *,
                         bool *);
 static inline void createblk(Block *, Tag *[NullTagName], const char *, int);
@@ -67,7 +67,7 @@ static inline Tag *tag_pop(Tag *stale)
   return tag;
 }
 
-static inline TagName parse_tagname(Parser *parser)
+static inline TagName parse_tagname(struct Parser *parser)
 {
   for (TagName tag_name = 0; tag_name < NullTagName; ++tag_name) {
     int len = strlen(TagNameRepr[tag_name]);
@@ -77,7 +77,8 @@ static inline TagName parse_tagname(Parser *parser)
   return NullTagName;
 }
 
-static inline TagModifierMask parse_tagmodifier(Parser *parser, TagName name)
+static inline TagModifierMask parse_tagmodifier(struct Parser *parser,
+                                                TagName name)
 {
   const TagModifier *mods = ValidTagModifiers[name];
   for (int e = 0; mods[e] != NullTagModifier; ++e) {
@@ -91,7 +92,7 @@ static inline TagModifierMask parse_tagmodifier(Parser *parser, TagName name)
 int parse(const char *text, TagName *tag_name, TagModifierMask *tmod_mask,
           char *val, bool *closing)
 {
-  Parser parser = p_new(text);
+  struct Parser parser = Parser(text);
   *tag_name = NullTagName, *tmod_mask = 0x0, *closing = false;
   static const size_t ntag_start = sizeof(TagStart) - 1,
                       ntag_end   = sizeof(TagEnd) - 1;

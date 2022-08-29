@@ -17,7 +17,7 @@
     exit(1);                                                                   \
   }
 
-typedef enum { ReadyEvent, DrawEvent, NoActionEvent } BarEvent;
+typedef enum { ReadyEvent, RenderEvent, NoActionEvent } XDBEvent;
 typedef enum { Stdin, Custom } BlockType;
 
 typedef struct {
@@ -53,7 +53,7 @@ extern const struct Core {
 void xdb_setup(void);
 void xdb_clear(BlockType);
 void xdb_render(BlockType);
-BarEvent xdb_nextevent(char[BLK_BUFFER_SIZE]);
+XDBEvent xdb_nextevent(char[BLK_BUFFER_SIZE]);
 void xdb_cleanup(void);
 
 #endif

@@ -34,11 +34,12 @@
 
 #include <stdint.h>
 
-#define BLK_BUFFER_SIZE (1 << 10)
-#define TagStart        "<"
-#define TagEnd          ">"
+#define BLK_BUFFER_SIZE /* minimum can be 'unsigned char' size. */ (1 << 10)
 
-#define Enum(indent, ...) typedef enum { __VA_ARGS__, Null##indent } indent
+#define TagStart "<"
+#define TagEnd   ">"
+
+#define Enum(ident, ...) typedef enum { __VA_ARGS__, Null##ident } ident
 Enum(TagName, Fn, Fg, Bg, Box, BtnL, BtnM, BtnR, ScrlU, ScrlD);
 Enum(TagModifier, Shift, Ctrl, Super, Alt, Left, Right, Top, Bottom);
 #undef Enum
