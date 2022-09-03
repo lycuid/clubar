@@ -53,6 +53,7 @@ extern const struct Core {
 void xdb_setup(void);
 void xdb_clear(BlockType);
 void xdb_render(BlockType);
+void xdb_toggle();
 XDBEvent xdb_nextevent(char[BLK_BUFFER_SIZE]);
 void xdb_cleanup(void);
 

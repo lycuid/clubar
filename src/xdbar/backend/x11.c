@@ -340,6 +340,14 @@ void xdb_render(BlockType blktype)
   }
 }
 
+void xdb_toggle()
+{
+  XWindowAttributes attrs;
+  XGetWindowAttributes(dpy, bar.window, &attrs);
+  attrs.map_state == IsUnmapped ? XMapWindow(dpy, bar.window)
+                                : XUnmapWindow(dpy, bar.window);
+}
+
 XDBEvent xdb_nextevent(char name[BLK_BUFFER_SIZE])
 {
   XEvent e;
@@ -347,9 +355,6 @@ XDBEvent xdb_nextevent(char name[BLK_BUFFER_SIZE])
     XNextEvent(dpy, &e);
     switch (e.type) {
     case MapNotify:
-      // start watching for property change event on root window, only after the
-      // bar window maps, as program might segfault, if tried to render on
-      // window that is not visible.
       XSelectInput(dpy, root, PropertyChangeMask);
       XStoreName(dpy, root, NAME "-" VERSION);
       return ReadyEvent;

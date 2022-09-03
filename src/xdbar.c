@@ -10,9 +10,9 @@
 #include <xdbar/core/blocks.h>
 
 #define LOCKED(mutex_ptr)                                                      \
-  /* @NOTE: Assuming lock/unlock is always successful. */                      \
-  for (int cond = pthread_mutex_lock(mutex_ptr) + 1; cond;                     \
-       cond     = pthread_mutex_unlock(mutex_ptr))
+  /* @GOTCHA: Assuming lock/unlock is always successful. */                    \
+  for (int __cond = pthread_mutex_lock(mutex_ptr) + 1; __cond;                 \
+       __cond     = pthread_mutex_unlock(mutex_ptr))
 
 #define RENDER(blktype, buffer)                                                \
   {                                                                            \
@@ -68,6 +68,7 @@ int main(int argc, char **argv)
   signal(SIGINT, quit);
   signal(SIGHUP, quit);
   signal(SIGTERM, quit);
+  signal(SIGUSR1, xdb_toggle);
 
   xdb_setup();
   pthread_create(&stdin_thread, NULL, stdin_thread_handler, NULL);
