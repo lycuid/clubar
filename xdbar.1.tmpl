@@ -1,0 +1,181 @@
+.TH APPNAME 1 APPNAME-APPVERSION
+
+.SH
+APPNAME
+.PP
+APPNAME \- Simple statusbar program.
+
+.SH
+SYNOPSIS
+.PP
+APPNAME
+[\fIOPTIONS\fR]...
+
+.SH
+DESCRIPTION
+.PP
+A minimalistic, flexible statusbar program (mainly as a utility for window managers).
+
+.RS 4
++ - - - - - - - - margin - - - - - - - - +
+.RE
+.RS 4
+¦ +------------------------------------+ ¦
+.RE
+.RS 4
+¦ | + - - - - - - padding - - - - - -+ | ¦
+.RE
+.RS 4
+¦ | ¦stdin                    WM_NAME¦ | ¦
+.RE
+.RS 4
+¦ | +- - - - - - - - - - - - - - - - + | ¦
+.RE
+.RS 4
+¦ +------------------------------------+ ¦
+.RE
+.RS 4
++- - - - - - - - - - - - - - - - - - - - +
+.RE
+
+\fImargin\fR is the empty space outside of the bar window.
+.br
+\fIpadding\fR is the space between the bar window edges and the drawing region.
+.br
+\fIstdin\fR text is typically provided by the window manager.
+.br
+\fIWM_NAME\fR (of the root window) can be set using the xsetroot command.
+.br
+
+.SH
+OPTIONS
+.PP
+\fB\-h, \-\-help\fR
+.RS
+Print usage and exit.
+.RE
+
+.PP
+\fB\-v, \-\-version\fR
+.RS
+Print version and exit.
+.RE
+
+.PP
+\fB\-c \fIfile\fR,
+\fB\-\-config\fR[=\fIfile\fR]
+.RS
+file path for runtime configs (supports: lua).
+
+.SH
+SIGNALS
+.PP
+\fBUSR1:\fR toggle window visibility (e.g. pkill -USR1 xdbar).
+
+.SH
+STYLING TEMPLATE
+.PP
+<Tag:Mod1|Mod2|...|Modn=Value> Text </Tag>
+.SH
+TAGS
+.PP
+\fBFn:\fR <Fn=\fINumber\fR> ... </Fn>
+.RS 4
+\fINumber\fR: Index of 'fonts' array from configs (default: 0).
+.RE
+.PP
+\fBFg:\fR <Fg=\fIColor\fR> ... </Fg>
+.RS 4
+\fIColor\fR: Valid color name.
+.RE
+.PP
+\fBBg:\fR <Bg=\fIColor\fR> ... </Bg>
+.RS 4
+\fIColor\fR: Valid color name.
+.RE
+.PP
+\fBBox:\fR <Box=\fIColor\fR> ... </Box> <Box=\fIColor\fR:\fISize\fR> ... </Box> <Box:\fIMod1\fR|\fIMod2\fR=\fIColor\fR:\fISize\fR> ... </Box>
+.RS 4
+\fIColor\fR: valid color name.
+.br
+\fISize\fR: size (default: 0) in pixels.
+.br
+\fIMods\fR: Left, Right, Top, Bottom
+.RE
+.PP
+\fBBtnL:\fR <BtnL=\fICommand\fR> ... </BtnL> <BtnL:\fIMod1\fR|\fIMod2\fR=\fICommand\fR> ... </BtnL>
+.RS 4
+\fICommand\fR: Raw command
+.br
+\fIMods\fR: Shift, Ctrl, Super, Alt
+.RE
+.PP
+\fBBtnM:\fR <BtnM=\fICommand\fR> ... </BtnM> <BtnM:\fIMod1\fR|\fIMod2\fR=\fICommand\fR> ... </BtnM>
+.RS 4
+\fICommand\fR: Raw command
+.br
+\fIMods\fR: Shift, Ctrl, Super, Alt
+.RE
+.PP
+\fBBtnR:\fR <BtnR=\fICommand\fR> ... </BtnR> <BtnR:\fIMod1\fR|\fIMod2\fR=\fICommand\fR> ... </BtnR>
+.RS 4
+\fICommand\fR: Raw command
+.br
+\fIMods\fR: Shift, Ctrl, Super, Alt
+.RE
+.PP
+\fBScrlU:\fR <ScrlU=\fICommand\fR> ... </ScrlU> <ScrlU:\fIMod1\fR|\fIMod2\fR=\fICommand\fR> ... </ScrlU>
+.RS 4
+\fICommand\fR: Raw command
+.br
+\fIMods\fR: Shift, Ctrl, Super, Alt
+.RE
+.PP
+\fBScrlD:\fR <ScrlD=\fICommand\fR> ... </ScrlD> <ScrlD:\fIMod1\fR|\fIMod2\fR=\fICommand\fR> ... </ScrlD>
+.RS 4
+\fICommand\fR: Raw command
+.br
+\fIMods\fR: Shift, Ctrl, Super, Alt
+.RE
+
+.SH
+EXAMPLES
+
+.PP
+<Fn=1><Fg=#131313> Colored </Fg> text with <Bg=#c6c6c6> background</Bg></Fn>.
+.PP
+<Box:Bottom=#ffffff:1> underlined </Box> text.
+.PP
+<Box:Top|Bottom|Left|Right=#ffffff:1> Boxed in </Box> text.
+.PP
+<BtnL=systemctl reboot> reboot </BtnL>
+.PP
+<BtnL:Ctrl|Shift=sudo -A reboot now> reboot w/ confirmation </BtnL>
+.PP
+<ScrlU:Ctrl=amixer sset Master 5%+>
+.RS 4
+  <ScrlD:Ctrl=amixer sset Master 5%->
+.RE
+.RS 8
+    volume
+.RE
+.RS 4
+  </ScrlD>
+.RE
+</ScrlU>
+.RE
+
+.SH
+AUTHOR
+.PP
+Written by Abhishek Kadam <lycuid@gmail.com>
+
+.SH
+BUGS
+.PP
+Submit issues at <\fIhttps://github.com/lycuid/APPNAME/issues/\fR>
+
+.SH
+COPYRIGHT
+.PP
+License GPLv3 <\fIhttps://gnu.org/licenses/gpl.html\fR>.

@@ -36,13 +36,14 @@ static inline void argparse(int argc, char *const *argv)
   while ((arg = getopt(argc, argv, "hvc:")) != -1) {
     switch (arg) {
     case 'h':
-      puts("USAGE: " NAME " [FLAGS|OPTIONS]");
-      puts("FLAGS:");
+      puts("USAGE: " NAME " [OPTIONS]...");
+      puts("OPTIONS:");
       puts("  -h    print this help message.");
       puts("  -v    print version.");
-      puts("OPTIONS:");
       puts("  -c <config_file>");
       puts("        filepath for runtime configs (supports: lua).");
+      puts("SIGNALS:");
+      puts("  USR1: toggle window visibility (e.g. pkill -USR1 xdbar).");
       exit(EXIT_SUCCESS);
     case 'v':
       puts(NAME ": v" VERSION);

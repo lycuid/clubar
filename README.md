@@ -29,7 +29,7 @@ Description
 ```
 - ***margin*** is the empty space outside of the bar window.
 - ***padding*** is the space between the bar window edges and the drawing region.
-- ***stdin*** text is typically provided by the window manager
+- ***stdin*** text is typically provided by the window manager.
 - ***WM_NAME*** (of the root window) can be set using the `xsetroot` command.
 
 **Setting `WM_NAME`**
@@ -42,6 +42,18 @@ while true; do
   xsetroot -name "$(whoami)@$(hostname) on $(uname -o) | $(date)"
   sleep 1
 done
+```
+Usage
+-----
+```txt
+USAGE: xdbar [OPTIONS]...
+OPTIONS:
+  -h    print this help message.
+  -v    print version.
+  -c <config_file>
+        filepath for runtime configs (supports: lua).
+SIGNALS:
+  USR1: toggle window visibility (e.g. pkill -USR1 xdbar).
 ```
 Requirements
 ------------

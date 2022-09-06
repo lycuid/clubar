@@ -7,6 +7,7 @@ BIN:=$(BUILD)/bin/$(NAME)
 BACKEND:=$(NAME)/backend
 PREFIX:=/usr/local
 BINPREFIX:=$(PREFIX)/bin
+MANPREFIX:=$(PREFIX)/man/man1
 
 PKGS=x11 xft
 PLUGINS=

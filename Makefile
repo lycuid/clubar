@@ -30,7 +30,10 @@ install: options $(BIN)
 	mkdir -p $(DESTDIR)$(BINPREFIX)
 	strip $(BIN)
 	cp -f $(BIN) $(DESTDIR)$(BINPREFIX)/$(NAME)
+	sed -e 's/APPNAME/$(NAME)/g' -e 's/APPVERSION/$(VERSION)/g' $(NAME).1.tmpl \
+		| gzip > $(DESTDIR)$(MANPREFIX)/$(NAME).1.gz
 	chmod 755 $(DESTDIR)$(BINPREFIX)/$(NAME)
+	chmod 644 $(DESTDIR)$(MANPREFIX)/$(NAME).1.gz
 
 uninstall:
 	$(RM) $(DESTDIR)$(BINPREFIX)/$(NAME)
