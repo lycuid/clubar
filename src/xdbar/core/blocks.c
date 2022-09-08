@@ -5,34 +5,35 @@
 
 #define FreeTags(tag_ptr) while ((tag_ptr = tag_pop(tag_ptr)))
 
-struct Parser {
+typedef struct Parser {
   const char *buffer;
   int cursor;
-};
+} Parser;
+#define Parser(text) (Parser){.buffer = text, .cursor = 0};
 
-#define Parser(text)      (struct Parser){.buffer = text, .cursor = 0};
-#define p_peek(p, ch)     ((p)->buffer[(p)->cursor] == ch)
+#define p_peek(p)         ((p)->buffer[(p)->cursor])
 #define p_buffer(p)       ((p)->buffer + (p)->cursor)
 #define p_advance(p, inc) ((p)->cursor += inc)
-#define p_consume(p, ch)  (p_peek(p, ch) && p_advance(p, 1))
+#define p_consume(p, ch)  (p_peek(p) == ch && p_advance(p, 1) > 0)
 #define p_consume_string(p, str, len)                                          \
-  (memcmp(str, p_buffer(p), (len)) == 0 && p_advance(p, (len)))
+  (memcmp(str, p_buffer(p), (len)) == 0 && p_advance(p, (len)) > 0)
 
 #define REPR(token) [token] = #token
 static const char *const TagNameRepr[NullTagName] = {
-    REPR(Fn),   REPR(Fg),   REPR(Bg),    REPR(Box),  REPR(BtnL),
-    REPR(BtnM), REPR(BtnR), REPR(ScrlU), REPR(ScrlD)};
-
+    REPR(Fn),   REPR(Fg),   REPR(Bg),    REPR(Box),   REPR(BtnL),
+    REPR(BtnM), REPR(BtnR), REPR(ScrlU), REPR(ScrlD),
+};
 static const char *const TagModifierRepr[NullTagModifier] = {
     REPR(Shift), REPR(Ctrl),  REPR(Super), REPR(Alt),
-    REPR(Left),  REPR(Right), REPR(Top),   REPR(Bottom)};
+    REPR(Left),  REPR(Right), REPR(Top),   REPR(Bottom),
+};
 #undef REPR
 
 static inline Tag *tag_clone(Tag *);
 static inline Tag *tag_push(Tag *, const char *, TagModifierMask);
 static inline Tag *tag_pop(Tag *);
-static inline TagName parse_tagname(struct Parser *);
-static inline TagModifierMask parse_tagmodifier(struct Parser *, TagName);
+static inline TagName parse_tagname(Parser *);
+static inline TagModifierMask parse_tagmodifier(Parser *, TagName);
 static inline int parse(const char *, TagName *, TagModifierMask *, char *,
                         bool *);
 static inline void createblk(Block *, Tag *[NullTagName], const char *, int);
@@ -67,7 +68,7 @@ static inline Tag *tag_pop(Tag *stale)
   return tag;
 }
 
-static inline TagName parse_tagname(struct Parser *parser)
+static inline TagName parse_tagname(Parser *parser)
 {
   for (TagName tag_name = 0; tag_name < NullTagName; ++tag_name) {
     int len = strlen(TagNameRepr[tag_name]);
@@ -77,8 +78,7 @@ static inline TagName parse_tagname(struct Parser *parser)
   return NullTagName;
 }
 
-static inline TagModifierMask parse_tagmodifier(struct Parser *parser,
-                                                TagName name)
+static inline TagModifierMask parse_tagmodifier(Parser *parser, TagName name)
 {
   const TagModifier *mods = ValidTagModifiers[name];
   for (int e = 0; mods[e] != NullTagModifier; ++e) {
@@ -92,7 +92,7 @@ static inline TagModifierMask parse_tagmodifier(struct Parser *parser,
 int parse(const char *text, TagName *tag_name, TagModifierMask *tmod_mask,
           char *val, bool *closing)
 {
-  struct Parser parser = Parser(text);
+  Parser parser = Parser(text);
   *tag_name = NullTagName, *tmod_mask = 0x0, *closing = false;
   static const size_t ntag_start = sizeof(TagStart) - 1,
                       ntag_end   = sizeof(TagEnd) - 1;
@@ -119,7 +119,7 @@ int parse(const char *text, TagName *tag_name, TagModifierMask *tmod_mask,
     if (!p_consume(&parser, '='))
       return 0;
     // parse tag value.
-    for (int cursor = 0; !p_peek(&parser, TagEnd[0]);)
+    for (int cursor = 0; !(p_peek(&parser) == TagEnd[0]);)
       val[cursor++] = parser.buffer[parser.cursor++];
   }
 
@@ -140,7 +140,7 @@ static inline void createblk(Block *blk, Tag *tags[NullTagName],
     blk->tags[i] = tag_clone(tags[i]);
 }
 
-int blks_create(const char *text, Block *blks)
+int blks_create(Block *blks, const char *text)
 {
   int len = strlen(text), nblks = 0, nbuf = 0, cursor;
   bool tagclose;

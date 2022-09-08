@@ -81,7 +81,7 @@ void core_init(int argc, char *const *argv)
 void core_update_blks(BlockType blktype, const char *buffer)
 {
   blks_free(local.blks[blktype], MAX_BLKS);
-  local.nblks[blktype] = blks_create(buffer, local.blks[blktype]);
+  local.nblks[blktype] = blks_create(local.blks[blktype], buffer);
 }
 
 void core_stop_running() { local.running = false; }

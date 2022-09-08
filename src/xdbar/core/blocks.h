@@ -69,7 +69,7 @@ typedef struct {
   Tag *tags[NullTagName];
 } Block;
 
-int blks_create(const char *, Block *);
+int blks_create(Block *, const char *);
 void blks_free(Block *, int);
 
 #endif
