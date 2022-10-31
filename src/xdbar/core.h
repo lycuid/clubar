@@ -17,7 +17,7 @@
     exit(1);                                                                   \
   }
 
-typedef enum { ReadyEvent, RenderEvent, NoActionEvent } XDBEvent;
+typedef enum { ReadyEvent, RenderEvent, ResetEvent, NoActionEvent } XDBEvent;
 typedef enum { Stdin, Custom } BlockType;
 
 typedef struct {

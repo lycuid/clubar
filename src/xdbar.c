@@ -9,17 +9,17 @@
 #include <unistd.h>
 #include <xdbar/core/blocks.h>
 
-#define THREADLOCK(mutex_ptr)                                                  \
-  /* @NOTE: Assuming lock/unlock is always successful. */                      \
+#define WITH_LOCK(mutex_ptr)                                                   \
+  /* @NOTE: Assuming lock/unlock is always successful (returns 0). */          \
   for (int __cond = pthread_mutex_lock(mutex_ptr) + 1; __cond;                 \
        __cond     = pthread_mutex_unlock(mutex_ptr))
 
-#define RENDER(blktype, buffer)                                                \
-  {                                                                            \
-    THREADLOCK(&mutex) { xdb_clear(blktype); }                                 \
-    core->update_blks(blktype, buffer);                                        \
-    THREADLOCK(&mutex) { xdb_render(blktype); }                                \
-  }
+#define RENDER_WITH(blktype)                                                   \
+  /* @NOTE: Assuming lock/unlock is always successful (returns 0). */          \
+  for (int _c = (pthread_mutex_lock(&mutex), xdb_clear(blktype),               \
+                 pthread_mutex_unlock(&mutex) + 1);                            \
+       _c; _c = (pthread_mutex_lock(&mutex), xdb_render(blktype),              \
+                 pthread_mutex_unlock(&mutex)))
 
 static pthread_mutex_t mutex     = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t read_stdin = PTHREAD_COND_INITIALIZER;
@@ -27,7 +27,7 @@ static bool window_ready         = false;
 static const struct timespec ts  = {.tv_nsec = 1e6 * (25 /* ms. */)};
 
 typedef struct IOReader {
-  char buffer[1 << 16];
+  char buffer[1 << 13];
   int start, end;
 } IOReader;
 #define IOReader() (IOReader){.start = 0, .end = 0};
@@ -57,9 +57,9 @@ static inline char *readline(IOReader *io)
   return NULL;
 }
 
-void *stdin_thread_handler()
+static void *stdin_thread_handler()
 {
-  THREADLOCK(&mutex)
+  WITH_LOCK(&mutex)
   {
     if (!window_ready)
       pthread_cond_wait(&read_stdin, &mutex);
@@ -69,15 +69,15 @@ void *stdin_thread_handler()
   fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK);
   for (bool running = core->running; running; nanosleep(&ts, NULL)) {
     if ((line = readline(&io)) && strlen(line) > 0)
-      RENDER(Stdin, line);
-    THREADLOCK(&mutex) { running = core->running; }
+      RENDER_WITH(Stdin) { core->update_blks(Stdin, line); }
+    WITH_LOCK(&mutex) { running = core->running; }
   }
   pthread_exit(0);
 }
 
 static void quit(__attribute__((unused)) int _arg)
 {
-  THREADLOCK(&mutex) { core->stop_running(); }
+  WITH_LOCK(&mutex) { core->stop_running(); }
 }
 
 int main(int argc, char **argv)
@@ -95,21 +95,28 @@ int main(int argc, char **argv)
   xdb_setup();
   pthread_create(&stdin_thread, NULL, stdin_thread_handler, NULL);
   for (bool running = core->running; running; nanosleep(&ts, NULL)) {
-    THREADLOCK(&mutex) { event = xdb_nextevent(buffer); }
+    WITH_LOCK(&mutex) { event = xdb_nextevent(buffer); }
     switch (event) {
     case ReadyEvent:
-      THREADLOCK(&mutex)
+      RENDER_WITH(Custom) { core->update_blks(Custom, buffer); }
+      WITH_LOCK(&mutex)
       {
         window_ready = true;
         pthread_cond_signal(&read_stdin);
       }
       break;
     case RenderEvent:
-      RENDER(Custom, buffer) break;
+      RENDER_WITH(Custom) { core->update_blks(Custom, buffer); }
+      break;
+    case ResetEvent:
+      RENDER_WITH(Stdin);
+      RENDER_WITH(Custom);
+      break;
+    case NoActionEvent:
     default:
       break;
     }
-    THREADLOCK(&mutex) { running = core->running; }
+    WITH_LOCK(&mutex) { running = core->running; }
   }
   pthread_join(stdin_thread, NULL);
   xdb_cleanup();

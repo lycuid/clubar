@@ -32,8 +32,7 @@ static char *ConfigFile = NULL;
 
 static inline void argparse(int argc, char *const *argv)
 {
-  char arg;
-  while ((arg = getopt(argc, argv, "hvc:")) != -1) {
+  for (char arg; (arg = getopt(argc, argv, "hvc:")) != -1;) {
     switch (arg) {
     case 'h':
       puts("USAGE: " NAME " [OPTIONS]...");

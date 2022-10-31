@@ -157,8 +157,7 @@ int blks_create(Block *blks, const char *text)
     if (text[cursor] == TagStart[0]) {
       memset(val, 0, sizeof(val));
       int size = parse(text + cursor, &tag_name, &tmod_mask, val, &tagclose);
-      // check for out of place closing tag (closing tag without corresponding
-      // opening tag).
+      // check for out of place closing tag.
       bool invalid = tagclose && tags[Current][tag_name] == NULL;
       // tag parse success check.
       if (size > 0 && tag_name != NullTagName && !invalid) {
@@ -168,7 +167,7 @@ int blks_create(Block *blks, const char *text)
         // only create block if there is some text in it.
         if (nbuf)
           createblk(&blks[nblks++], tags[Previous], buf, nbuf);
-
+        // move 'cursor' forward, parsed text 'size'.
         cursor += size;
         FreeTags(tags[Previous][tag_name]);
         tags[Previous][tag_name] = tag_clone(tags[Current][tag_name]);

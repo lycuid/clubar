@@ -36,12 +36,13 @@ static inline XftColor *get_cached_color(const char *);
 static inline int parse_box_string(const char *, char[32]);
 static inline void drw_init(const Config *);
 static inline void bar_init(const BarConfig *);
-static inline void prepare_stdinblks(void);
-static inline void prepare_customblks(void);
+static inline void generate_stdin_gis(void);
+static inline void generate_custom_gis(void);
 static inline void xrender_bg(const Block *, const GlyphInfo *);
 static inline void xrender_box(const Block *, const GlyphInfo *);
 static inline void xrender_string(const Block *, const GlyphInfo *);
 static inline void execute_cmd(const char *);
+static inline bool get_window_name(char *);
 static void onButtonPress(const XEvent *);
 static bool onPropertyNotify(const XEvent *, char *);
 
@@ -110,7 +111,7 @@ static inline void bar_init(const BarConfig *barConfig)
   bar.canvas = XftDrawCreate(dpy, bar.window, vis, cmap);
 }
 
-static inline void prepare_stdinblks(void)
+static inline void generate_stdin_gis(void)
 {
   XGlyphInfo extent;
   int fnindex, startx = 0;
@@ -125,7 +126,7 @@ static inline void prepare_stdinblks(void)
   }
 }
 
-static inline void prepare_customblks(void)
+static inline void generate_custom_gis(void)
 {
   XGlyphInfo extent;
   int fnindex, startx = bar.canvas_g.x + bar.canvas_g.w;
@@ -221,6 +222,17 @@ static inline void execute_cmd(const char *cmd_string)
   exit(EXIT_SUCCESS);
 }
 
+static inline bool get_window_name(char *buffer)
+{
+  char *wm_name;
+  if (XFetchName(dpy, root, &wm_name) && wm_name) {
+    strcpy(buffer, wm_name);
+    XFree(wm_name);
+    return true;
+  }
+  return false;
+}
+
 static void onButtonPress(const XEvent *xevent)
 {
   const XButtonEvent *e     = &xevent->xbutton;
@@ -265,14 +277,8 @@ static void onButtonPress(const XEvent *xevent)
 static bool onPropertyNotify(const XEvent *xevent, char *name)
 {
   const XPropertyEvent *e = &xevent->xproperty;
-  char *wm_name;
-  if (e->window == root && e->atom == ATOM_WM_NAME) {
-    if (XFetchName(dpy, root, &wm_name) && wm_name) {
-      strcpy(name, wm_name);
-      XFree(wm_name);
-      return true;
-    }
-  }
+  if (e->window == root && e->atom == ATOM_WM_NAME)
+    return get_window_name(name);
   return false;
 }
 
@@ -325,12 +331,13 @@ void xdb_render(BlockType blktype)
 {
   switch (blktype) {
   case Stdin:
-    prepare_stdinblks();
+    generate_stdin_gis();
     break;
   case Custom:
-    prepare_customblks();
+    generate_custom_gis();
     break;
   }
+
   for (int i = 0; i < core->nblks[blktype]; ++i) {
     const Block *blk    = &core->blks[blktype][i];
     const GlyphInfo *gi = &drw.gis[blktype][i];
@@ -356,7 +363,7 @@ XDBEvent xdb_nextevent(char name[BLK_BUFFER_SIZE])
     switch (e.type) {
     case MapNotify:
       XSelectInput(dpy, root, PropertyChangeMask);
-      XStoreName(dpy, root, NAME "-" VERSION);
+      get_window_name(name);
       return ReadyEvent;
     case ButtonPress:
       onButtonPress(&e);
@@ -366,9 +373,7 @@ XDBEvent xdb_nextevent(char name[BLK_BUFFER_SIZE])
     // is only if no compositor is running, something like 'picom').
     case Expose:
       FILL(0, 0, bar.window_g.w, bar.window_g.h);
-      xdb_render(Stdin);
-      xdb_render(Custom);
-      break;
+      return ResetEvent;
     // root window events.
     case PropertyNotify:
       if (onPropertyNotify(&e, name))
