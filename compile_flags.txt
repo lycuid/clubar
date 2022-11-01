@@ -8,7 +8,7 @@
 -std=c99
 -D_GNU_SOURCE
 -DNAME="xdbar"
--DVERSION="0.4.1"
+-DVERSION="0.4.2"
 -I/usr/include/freetype2
 -I/usr/include/libpng16
 -I/usr/include/harfbuzz

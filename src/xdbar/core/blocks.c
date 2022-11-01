@@ -135,7 +135,6 @@ static inline void createblk(Block *blk, Tag *tags[NullTagName],
 {
   blk->ntext = ntext;
   memcpy(blk->text, text, ntext);
-
   for (int i = 0; i < NullTagName; ++i)
     blk->tags[i] = tag_clone(tags[i]);
 }

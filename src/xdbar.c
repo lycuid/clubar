@@ -7,24 +7,35 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <xdbar/core/blocks.h>
 
-#define WITH_LOCK(mutex_ptr)                                                   \
+#define WITH_MUTEX(mutex_ptr)                                                  \
   /* @NOTE: Assuming lock/unlock is always successful (returns 0). */          \
   for (int __cond = pthread_mutex_lock(mutex_ptr) + 1; __cond;                 \
        __cond     = pthread_mutex_unlock(mutex_ptr))
 
-#define RENDER_WITH(blktype)                                                   \
+#define RENDER(blktype)                                                        \
   /* @NOTE: Assuming lock/unlock is always successful (returns 0). */          \
-  for (int _c = (pthread_mutex_lock(&mutex), xdb_clear(blktype),               \
-                 pthread_mutex_unlock(&mutex) + 1);                            \
-       _c; _c = (pthread_mutex_lock(&mutex), xdb_render(blktype),              \
-                 pthread_mutex_unlock(&mutex)))
+  for (int _c = (pthread_mutex_lock(&xdb_mutex), xdb_clear(blktype),           \
+                 pthread_mutex_unlock(&xdb_mutex) + 1);                        \
+       _c; _c = (pthread_mutex_lock(&xdb_mutex), xdb_render(blktype),          \
+                 pthread_mutex_unlock(&xdb_mutex)))
 
-static pthread_mutex_t mutex     = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t read_stdin = PTHREAD_COND_INITIALIZER;
-static bool window_ready         = false;
-static const struct timespec ts  = {.tv_nsec = 1e6 * (25 /* ms. */)};
+struct ThreadSync {
+  bool ready;
+  pthread_mutex_t mutex;
+  pthread_cond_t cond;
+};
+// clang-format off
+#define ThreadSync() {false, PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER}
+#define THREADSYNC_WAIT(t) WITH_MUTEX(&t.mutex) if (!t.ready) pthread_cond_wait(&t.cond, &t.mutex);
+#define THREADSYNC_SIGNAL(t) WITH_MUTEX(&t.mutex) { t.ready = true; pthread_cond_signal(&t.cond); }
+// clang-format on
+
+static struct ThreadSync stdin_threadsync = ThreadSync();
+static pthread_mutex_t
+    core_mutex = PTHREAD_MUTEX_INITIALIZER, // for accessing 'core' struct.
+    xdb_mutex  = PTHREAD_MUTEX_INITIALIZER; // for running 'xdb_' apis.
+static const struct timespec ts = {.tv_nsec = 1e6 * (25 /* ms. */)};
 
 typedef struct IOReader {
   char buffer[1 << 13];
@@ -59,25 +70,21 @@ static inline char *readline(IOReader *io)
 
 static void *stdin_thread_handler()
 {
-  WITH_LOCK(&mutex)
-  {
-    if (!window_ready)
-      pthread_cond_wait(&read_stdin, &mutex);
-  }
+  THREADSYNC_WAIT(stdin_threadsync);
   IOReader io = IOReader();
   char *line;
   fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK);
   for (bool running = core->running; running; nanosleep(&ts, NULL)) {
     if ((line = readline(&io)) && strlen(line) > 0)
-      RENDER_WITH(Stdin) { core->update_blks(Stdin, line); }
-    WITH_LOCK(&mutex) { running = core->running; }
+      RENDER(Stdin) { core->update_blks(Stdin, line); }
+    WITH_MUTEX(&core_mutex) { running = core->running; }
   }
   pthread_exit(0);
 }
 
 static void quit(__attribute__((unused)) int _arg)
 {
-  WITH_LOCK(&mutex) { core->stop_running(); }
+  WITH_MUTEX(&core_mutex) { core->stop_running(); }
 }
 
 int main(int argc, char **argv)
@@ -95,28 +102,21 @@ int main(int argc, char **argv)
   xdb_setup();
   pthread_create(&stdin_thread, NULL, stdin_thread_handler, NULL);
   for (bool running = core->running; running; nanosleep(&ts, NULL)) {
-    WITH_LOCK(&mutex) { event = xdb_nextevent(buffer); }
-    switch (event) {
+    switch (event = xdb_nextevent(buffer)) {
     case ReadyEvent:
-      RENDER_WITH(Custom) { core->update_blks(Custom, buffer); }
-      WITH_LOCK(&mutex)
-      {
-        window_ready = true;
-        pthread_cond_signal(&read_stdin);
-      }
-      break;
+      THREADSYNC_SIGNAL(stdin_threadsync); // fall through.
     case RenderEvent:
-      RENDER_WITH(Custom) { core->update_blks(Custom, buffer); }
+      RENDER(Custom) { core->update_blks(Custom, buffer); }
       break;
     case ResetEvent:
-      RENDER_WITH(Stdin);
-      RENDER_WITH(Custom);
+      RENDER(Stdin);
+      RENDER(Custom);
       break;
     case NoActionEvent:
     default:
       break;
     }
-    WITH_LOCK(&mutex) { running = core->running; }
+    WITH_MUTEX(&core_mutex) { running = core->running; }
   }
   pthread_join(stdin_thread, NULL);
   xdb_cleanup();
