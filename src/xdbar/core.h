@@ -17,7 +17,12 @@
     exit(1);                                                                   \
   }
 
-typedef enum { ReadyEvent, RenderEvent, ResetEvent, NoActionEvent } XDBEvent;
+typedef enum {
+  XDBReady,    // Window's canvas is ready and can now be drawn upon.
+  XDBNewValue, // New Value was just populated in the provided buffer.
+  XDBReset,    // Reset window canvas.
+  XDBNoOp,     // NoOP.
+} xdb_event_t;
 typedef enum { Stdin, Custom } BlockType;
 
 typedef struct {
@@ -49,12 +54,20 @@ extern const struct Core {
   void (*stop_running)();
 } * core;
 
-// These are supposed to be implemented by whatever 'backend' thats being used.
+/* These functions are supposed to be implemented by whichever 'backend' that is
+ * being used. */
+
+// Setup and show window.
 void xdb_setup(void);
+// Clear window canvas.
 void xdb_clear(BlockType);
+// render on the window canvas.
 void xdb_render(BlockType);
+// toggle window visibility.
 void xdb_toggle();
-XDBEvent xdb_nextevent(char[BLK_BUFFER_SIZE]);
+// get next window event.
+xdb_event_t xdb_nextevent(char[BLK_BUFFER_SIZE]);
+// cleanup memory allocs and stuff and kill window.
 void xdb_cleanup(void);
 
 #endif

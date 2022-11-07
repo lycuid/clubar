@@ -2,46 +2,46 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
 
-#define WITH_MUTEX(mutex_ptr)                                                  \
-  /* @NOTE: Assuming lock/unlock is always successful (returns 0). */          \
-  for (int __cond = pthread_mutex_lock(mutex_ptr) + 1; __cond;                 \
-       __cond     = pthread_mutex_unlock(mutex_ptr))
-
-#define RENDER(blktype)                                                        \
+#define CLEAR_AND_RENDER_WITH(blktype)                                         \
   /* @NOTE: Assuming lock/unlock is always successful (returns 0). */          \
   for (int _c = (pthread_mutex_lock(&xdb_mutex), xdb_clear(blktype),           \
-                 pthread_mutex_unlock(&xdb_mutex) + 1);                        \
+                 pthread_mutex_unlock(&xdb_mutex), 1);                         \
        _c; _c = (pthread_mutex_lock(&xdb_mutex), xdb_render(blktype),          \
                  pthread_mutex_unlock(&xdb_mutex)))
 
-struct ThreadSync {
-  bool ready;
-  pthread_mutex_t mutex;
-  pthread_cond_t cond;
-};
-// clang-format off
-#define ThreadSync() {false, PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER}
-#define THREADSYNC_WAIT(t) WITH_MUTEX(&t.mutex) if (!t.ready) pthread_cond_wait(&t.cond, &t.mutex);
-#define THREADSYNC_SIGNAL(t) WITH_MUTEX(&t.mutex) { t.ready = true; pthread_cond_signal(&t.cond); }
-// clang-format on
-
-static struct ThreadSync stdin_threadsync = ThreadSync();
-static pthread_mutex_t
-    core_mutex = PTHREAD_MUTEX_INITIALIZER, // for accessing 'core' struct.
-    xdb_mutex  = PTHREAD_MUTEX_INITIALIZER; // for running 'xdb_' apis.
-static const struct timespec ts = {.tv_nsec = 1e6 * (25 /* ms. */)};
+#define WITH_MUTEX(mutex_ptr)                                                  \
+  /* @NOTE: Assuming lock/unlock is always successful (returns 0). */          \
+  for (int __cond = (pthread_mutex_lock(mutex_ptr), 1); __cond;                \
+       __cond     = pthread_mutex_unlock(mutex_ptr))
 
 typedef struct IOReader {
   char buffer[1 << 13];
   int start, end;
 } IOReader;
 #define IOReader() (IOReader){.start = 0, .end = 0};
+
+typedef struct ThreadSync {
+  bool ready;
+  pthread_mutex_t mutex;
+  pthread_cond_t cond;
+} ThreadSync;
+// clang-format off
+#define ThreadSync() {false, PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER}
+#define THREADSYNC_WAIT(t) WITH_MUTEX(&t.mutex) if (!t.ready) pthread_cond_wait(&t.cond, &t.mutex);
+#define THREADSYNC_SIGNAL(t) WITH_MUTEX(&t.mutex) { t.ready = true; pthread_cond_signal(&t.cond); }
+
+static ThreadSync stdin_threadsync  = ThreadSync();
+static pthread_mutex_t  core_mutex  = PTHREAD_MUTEX_INITIALIZER, // core apis.
+                         xdb_mutex  = PTHREAD_MUTEX_INITIALIZER; // 'xdb_' apis.
+static const struct timespec ts     = {.tv_nsec = 1e6 * (25 /* ms. */)};
+// clang-format on
 
 static inline char *readline(IOReader *io)
 {
@@ -76,7 +76,7 @@ static void *stdin_thread_handler()
   fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK);
   for (bool running = core->running; running; nanosleep(&ts, NULL)) {
     if ((line = readline(&io)) && strlen(line) > 0)
-      RENDER(Stdin) { core->update_blks(Stdin, line); }
+      CLEAR_AND_RENDER_WITH(Stdin) { core->update_blks(Stdin, line); }
     WITH_MUTEX(&core_mutex) { running = core->running; }
   }
   pthread_exit(0);
@@ -91,7 +91,7 @@ int main(int argc, char **argv)
 {
   char buffer[BLK_BUFFER_SIZE];
   pthread_t stdin_thread;
-  XDBEvent event = NoActionEvent;
+  xdb_event_t event = XDBNoOp;
 
   core->init(argc, argv);
   signal(SIGINT, quit);
@@ -103,16 +103,16 @@ int main(int argc, char **argv)
   pthread_create(&stdin_thread, NULL, stdin_thread_handler, NULL);
   for (bool running = core->running; running; nanosleep(&ts, NULL)) {
     switch (event = xdb_nextevent(buffer)) {
-    case ReadyEvent:
+    case XDBReady:
       THREADSYNC_SIGNAL(stdin_threadsync); // fall through.
-    case RenderEvent:
-      RENDER(Custom) { core->update_blks(Custom, buffer); }
+    case XDBNewValue:
+      CLEAR_AND_RENDER_WITH(Custom) { core->update_blks(Custom, buffer); }
       break;
-    case ResetEvent:
-      RENDER(Stdin);
-      RENDER(Custom);
+    case XDBReset:
+      CLEAR_AND_RENDER_WITH(Stdin);
+      CLEAR_AND_RENDER_WITH(Custom);
       break;
-    case NoActionEvent:
+    case XDBNoOp:
     default:
       break;
     }

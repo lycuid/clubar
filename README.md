@@ -34,7 +34,7 @@ Description
 
 **Setting `WM_NAME`**
 - [slstatus](https://tools.suckless.org/slstatus)
-- [smolprog](https://github.com/lycuid/smolprog) (much faster and overall just better than slstatus...coz. Rust. I guess?).
+- [smolprog](https://github.com/lycuid/smolprog/tree/port/rust) (much faster and overall just better than slstatus...coz. Rust. I guess?).
 - Custom script example:
 ```bash
 #!/bin/bash
@@ -63,7 +63,7 @@ Requirements
 
 **Optional**
   - pkg-config  (if not installed, update `config.mk` accordingly).
-  - lua         (required if using `luaconfig` patch).
+  - lua         (required if using `luaconfig` plugin).
 
 Build
 -----

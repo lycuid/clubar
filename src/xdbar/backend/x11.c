@@ -355,7 +355,7 @@ void xdb_toggle()
                                 : XUnmapWindow(dpy, bar.window);
 }
 
-XDBEvent xdb_nextevent(char name[BLK_BUFFER_SIZE])
+xdb_event_t xdb_nextevent(char value[BLK_BUFFER_SIZE])
 {
   XEvent e;
   if (XPending(dpy)) {
@@ -363,8 +363,8 @@ XDBEvent xdb_nextevent(char name[BLK_BUFFER_SIZE])
     switch (e.type) {
     case MapNotify:
       XSelectInput(dpy, root, PropertyChangeMask);
-      get_window_name(name);
-      return ReadyEvent;
+      get_window_name(value);
+      return XDBReady;
     case ButtonPress:
       onButtonPress(&e);
       break;
@@ -373,15 +373,15 @@ XDBEvent xdb_nextevent(char name[BLK_BUFFER_SIZE])
     // is only if no compositor is running, something like 'picom').
     case Expose:
       FILL(0, 0, bar.window_g.w, bar.window_g.h);
-      return ResetEvent;
+      return XDBReset;
     // root window events.
     case PropertyNotify:
-      if (onPropertyNotify(&e, name))
-        return RenderEvent;
+      if (onPropertyNotify(&e, value))
+        return XDBNewValue;
       break;
     }
   }
-  return NoActionEvent;
+  return XDBNoOp;
 }
 
 void xdb_cleanup(void)
