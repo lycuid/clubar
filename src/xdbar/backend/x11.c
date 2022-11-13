@@ -171,13 +171,12 @@ static inline void xrender_box(const Block *blk, const GlyphInfo *gi)
         case Top:
           bx = gi->x, bw = gi->width, bh = size;
           break;
-        case Bottom: // default.
+        case Bottom: // fall through.
         default:
           bx = gi->x, by = canvas_g->y + canvas_g->h - size, bw = gi->width,
           bh = size;
         }
-        XftColor *rectcolor = get_cached_color(color);
-        XftDrawRect(bar.canvas, rectcolor, bx, by, bw, bh);
+        XftDrawRect(bar.canvas, get_cached_color(color), bx, by, bw, bh);
       }
     }
   }
@@ -196,29 +195,30 @@ static void xrender_string(const Block *blk, const GlyphInfo *gi)
                     (FcChar8 *)blk->text, blk->ntext);
 }
 
-static inline void execute_cmd(const char *cmd_string)
+static inline void execute_cmd(const char *cmd)
 {
   if (fork())
     return;
   if (dpy)
     close(ConnectionNumber(dpy));
-
-  // splitting space seperated cmd into an array.
-  int cursor = 0;
-  char *cmd[50];
-  cmd[0] = calloc(50, sizeof(char));
-  for (size_t i = 0, j = 0; i < strlen(cmd_string); ++i) {
-    if (cmd_string[i] == ' ' && j > 0 && !(j = 0)) {
-      cmd[++cursor] = calloc(50, sizeof(char));
-      continue;
+  // splitting space seperated 'cmd' string into an array of 'words'.
+  char *words[50];
+  size_t cursor = 0;
+  for (size_t i = 0, j = 0, k = 0, len = strlen(cmd); i < len;) {
+    for (; i < len && cmd[i] == ' '; ++i) // ignoring spaces.
+      (void)0;
+    for (j = i; i < len && cmd[i] != ' '; ++i) // counting non-space chars.
+      (void)0;
+    if (j < i) {
+      for (words[cursor] = calloc(i - j + 1, sizeof(char)), k = 0; j < i;)
+        words[cursor][k++] = cmd[j++];
+      words[++cursor] = NULL;
     }
-    cmd[cursor][j++] = cmd_string[i];
   }
-  cmd[++cursor] = NULL;
-
-  execvp(cmd[0], (char **)cmd);
-  for (int i = 0; i < cursor; ++i)
-    free(cmd[i]);
+  if (cursor)
+    execvp(words[0], (char **)words);
+  for (size_t i = 0; i < cursor; ++i)
+    free(words[i]);
   exit(EXIT_SUCCESS);
 }
 
