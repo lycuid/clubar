@@ -33,14 +33,17 @@ typedef struct ThreadSync {
   pthread_cond_t cond;
 } ThreadSync;
 // clang-format off
-#define ThreadSync() {false, PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER}
-#define THREADSYNC_WAIT(t) WITH_MUTEX(&t.mutex) if (!t.ready) pthread_cond_wait(&t.cond, &t.mutex);
-#define THREADSYNC_SIGNAL(t) WITH_MUTEX(&t.mutex) { t.ready = true; pthread_cond_signal(&t.cond); }
+#define ThreadSync()                                                            \
+  {false, PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER}
+#define THREADSYNC_WAIT(t)                                                      \
+  WITH_MUTEX(&t.mutex) if (!t.ready) pthread_cond_wait(&t.cond, &t.mutex);
+#define THREADSYNC_SIGNAL(t)                                                    \
+  WITH_MUTEX(&t.mutex) { t.ready = true; pthread_cond_signal(&t.cond); }
 
 static ThreadSync stdin_threadsync  = ThreadSync();
-static pthread_mutex_t  core_mutex  = PTHREAD_MUTEX_INITIALIZER, // core apis.
-                         xdb_mutex  = PTHREAD_MUTEX_INITIALIZER; // 'xdb_' apis.
-static const struct timespec ts     = {.tv_nsec = 1e6 * (25 /* ms. */)};
+static pthread_mutex_t core_mutex   = PTHREAD_MUTEX_INITIALIZER, // core apis.
+                       xdb_mutex    = PTHREAD_MUTEX_INITIALIZER; // 'xdb_' apis.
+static const struct timespec ts     = {.tv_nsec = 1e6 * 1000 / 120};
 // clang-format on
 
 static inline char *readline(IOReader *io)

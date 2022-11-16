@@ -91,43 +91,40 @@ static inline TagModifierMask parse_tagmodifier(Parser *parser, TagName name)
 
 int parse(const char *text, TagName *tag_name, TagModifierMask *tmod_mask,
           char *val, bool *closing)
-{
+{ // clang-format off
+#define TRY(expr) if (!(expr)) return 0; // clang-format on
   Parser parser = Parser(text);
   *tag_name = NullTagName, *tmod_mask = 0x0, *closing = false;
+  // 'sizeof' counts null termination.
   static const size_t ntag_start = sizeof(TagStart) - 1,
                       ntag_end   = sizeof(TagEnd) - 1;
 
   // parse tag start.
-  if (!p_consume_string(&parser, TagStart, ntag_start))
-    return 0;
+  TRY(p_consume_string(&parser, TagStart, ntag_start));
   *closing = p_consume(&parser, '/');
 
   // parse tag name.
-  if ((*tag_name = parse_tagname(&parser)) == NullTagName)
-    return 0;
+  TRY((*tag_name = parse_tagname(&parser)) != NullTagName);
 
   if (!*closing) {
     if (p_consume(&parser, ':')) {
       // parse tag modifiers.
       int mod = NullTagModifier;
       do {
-        if ((mod = parse_tagmodifier(&parser, *tag_name)) == NullTagModifier)
-          return 0;
+        TRY((mod = parse_tagmodifier(&parser, *tag_name)) != NullTagModifier);
         *tmod_mask |= (1 << mod);
       } while (p_consume(&parser, '|'));
     }
-    if (!p_consume(&parser, '='))
-      return 0;
+    TRY(p_consume(&parser, '='));
     // parse tag value.
     for (int cursor = 0; !(p_peek(&parser) == TagEnd[0]);)
       val[cursor++] = parser.buffer[parser.cursor++];
   }
 
   // parse tag end.
-  if (!p_consume_string(&parser, TagEnd, ntag_end))
-    return 0;
-
+  TRY(p_consume_string(&parser, TagEnd, ntag_end));
   return parser.cursor - 1;
+#undef TRY
 }
 
 static inline void createblk(Block *blk, Tag *tags[NullTagName],
