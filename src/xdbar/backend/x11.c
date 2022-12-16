@@ -15,8 +15,16 @@ typedef struct {
 typedef struct ColorCache {
   char name[32];
   XftColor val;
-  struct ColorCache *previous;
+  struct ColorCache *prev, *next;
 } ColorCache;
+
+#define Attach(c)                                                              \
+  if ((c->prev = NULL, c->next = drw.colorcache))                              \
+    drw.colorcache->prev = c;                                                  \
+  drw.colorcache = c;
+#define Detach(c)                                                              \
+  (void)(c->prev ? (c->prev->next = c->next) : (drw.colorcache = c->next));    \
+  (void)(c->next ? (c->next->prev = c->prev) : 0);
 
 static struct Draw {
   int nfonts;
@@ -55,17 +63,30 @@ static Atom ATOM_WM_NAME;
 #define vis       (DefaultVisual(dpy, scr))
 #define cmap      (DefaultColormap(dpy, scr))
 
+// LRU cache (linear) which is fine, as the capacity is not that huge.
 static inline XftColor *get_cached_color(const char *colorname)
 {
-  for (ColorCache *c = drw.colorcache; c != NULL; c = c->previous)
-    if (strcmp(c->name, colorname) == 0)
+  static int capacity = 1 << 5;
+  ColorCache *last    = NULL;
+  for (ColorCache *c = drw.colorcache; c; last = c, c = c->next) {
+    if (strcmp(c->name, colorname) == 0) {
+      // bring it to top.
+      Detach(c);
+      Attach(c);
       return &c->val;
-  // @TODO: currently not handling error when allocating colors.
+    }
+  }
+  if (capacity) {
+    capacity--;
+  } else if (last) {
+    Detach(last);
+    XftColorFree(dpy, vis, cmap, &last->val);
+    free(last);
+  }
   ColorCache *color = (ColorCache *)malloc(sizeof(ColorCache));
   XftColorAllocName(dpy, vis, cmap, colorname, &color->val);
   strcpy(color->name, colorname);
-  color->previous = drw.colorcache;
-  drw.colorcache  = color;
+  Attach(color);
   return &drw.colorcache->val;
 }
 
@@ -386,10 +407,10 @@ xdb_event_t xdb_nextevent(char value[BLK_BUFFER_SIZE])
 
 void xdb_cleanup(void)
 {
-  while (drw.colorcache != NULL) {
+  while (drw.colorcache) {
     XftColorFree(dpy, vis, cmap, &drw.colorcache->val);
     ColorCache *stale = drw.colorcache;
-    drw.colorcache    = drw.colorcache->previous;
+    drw.colorcache    = drw.colorcache->next;
     free(stale);
   }
   for (int fn = 0; fn < drw.nfonts; ++fn)

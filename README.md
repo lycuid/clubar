@@ -57,9 +57,11 @@ SIGNALS:
 ```
 Requirements
 ------------
+  - ***free***, ***libre*** and ***open-source*** Operating System (currently doesn't support \*BSD).
   - gnu make
   - libx11
   - libxft
+  - pkg-config (optional, changes would be required in Makefile)
 
 **Optional**
   - pkg-config  (if not installed, update `config.mk` accordingly).
