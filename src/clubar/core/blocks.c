@@ -9,7 +9,7 @@ typedef struct Parser {
   const char *buffer;
   int cursor;
 } Parser;
-#define Parser(text) (Parser){.buffer = text, .cursor = 0};
+#define PARSER(text) (Parser){.buffer = text, .cursor = 0};
 
 #define p_peek(p)         ((p)->buffer[(p)->cursor])
 #define p_buffer(p)       ((p)->buffer + (p)->cursor)
@@ -93,7 +93,7 @@ int parse(const char *text, TagName *tag_name, TagModifierMask *tmod_mask,
           char *val, bool *closing)
 { // clang-format off
 #define TRY(expr) if (!(expr)) return 0; // clang-format on
-  Parser parser = Parser(text);
+  Parser parser = PARSER(text);
   *tag_name = NullTagName, *tmod_mask = 0x0, *closing = false;
   // 'sizeof' counts null termination.
   static const size_t ntag_start = sizeof(TagStart) - 1,

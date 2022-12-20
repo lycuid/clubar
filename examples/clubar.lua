@@ -1,5 +1,5 @@
 -- This is an example config file which can be used with the '-c' option.
--- check 'xdbar -h' for more info.
+-- check 'clubar -h' for more info.
 
 local screenwidth = 1366;
 local padding = {left = 2, right = 2, top = 2, bottom = 2};

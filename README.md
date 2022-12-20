@@ -1,20 +1,15 @@
-XD Bar
-------
-A minialistic, lightweight, customizable statusbar, inspired by [**X**mobar](https://xmobar.org/) and [**D**wm](https://dwm.suckless.org/)'s statusbar, for X11 Desktops, that are compatible with
-[EWMH](https://specifications.freedesktop.org/wm-spec/latest/) specifications.
+cluless statusbar
+-----------------
+A minialistic, lightweight, customizable statusbar (formerly *xdbar*), inspired by [xmobar](https://xmobar.org/) and [dwm](https://dwm.suckless.org/)'s statusbar, for X11 Desktops (wayland in progress), that are compatible with [EWMH](https://specifications.freedesktop.org/wm-spec/latest/) specifications.
 
-Rendering styled/clickable text, is inspired by xmobar's approach of having XML like `tags` in the string.  
+Rendering styled/clickable text, is inspired by xmobar's approach of wrapping text in XML like *tags*.  
 Populating statusbar is inspired by dwm statusbar's approach of using the root window's `WM_NAME` attribute text.
 
-Future Goals: Maybe rewrite in Rust. :pepehands:
-
-Screenshots
------------
-![dark.png](https://raw.githubusercontent.com/lycuid/xdbar/master/screenshots/dark.png)
+![dark.png](https://raw.githubusercontent.com/lycuid/clubar/master/screenshots/dark.png)
 
 ----
 
-![light.png](https://raw.githubusercontent.com/lycuid/xdbar/master/screenshots/light.png)
+![light.png](https://raw.githubusercontent.com/lycuid/clubar/master/screenshots/light.png)
 
 Description
 -----------
@@ -34,7 +29,7 @@ Description
 
 **Setting `WM_NAME`**
 - [slstatus](https://tools.suckless.org/slstatus)
-- [smolprog](https://github.com/lycuid/smolprog/tree/port/rust) (much faster and overall just better than slstatus...coz. Rust. I guess?).
+- [smolprog](https://github.com/lycuid/smolprog/) *(my personal script)*
 - Custom script example:
 ```bash
 #!/bin/bash
@@ -46,22 +41,21 @@ done
 Usage
 -----
 ```txt
-USAGE: xdbar [OPTIONS]...
+USAGE: clubar [OPTIONS]...
 OPTIONS:
   -h    print this help message.
   -v    print version.
   -c <config_file>
         filepath for runtime configs (supports: lua).
 SIGNALS:
-  USR1: toggle window visibility (e.g. pkill -USR1 xdbar).
+  USR1: toggle window visibility (e.g. pkill -USR1 clubar).
 ```
 Requirements
 ------------
-  - ***free***, ***libre*** and ***open-source*** Operating System (currently doesn't support \*BSD).
+  - *free* and *open source* Operating System (currently doesn't support \*BSD).
   - gnu make
   - libx11
   - libxft
-  - pkg-config (optional, changes would be required in Makefile)
 
 **Optional**
   - pkg-config  (if not installed, update `config.mk` accordingly).
@@ -83,7 +77,7 @@ sudo make install
 ```
 
 **Available Plugins** 
-(Note: plugins are just space seperated c filenames, from [plugins](/src/xdbar/plugins/) directory, without file extension, see [examples](/examples).)
+(Note: plugins are just space seperated c filenames, from [plugins](/src/clubar/plugins/) directory, without file extension, see [examples](/examples).)
 
 - **luaconfig**: runtime config support with lua source file.
 - **xrmconfig**: runtime config support with X Resources.

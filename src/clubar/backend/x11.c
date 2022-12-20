@@ -2,11 +2,11 @@
 #include <X11/Xft/Xft.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <clubar/core.h>
+#include <clubar/core/blocks.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <unistd.h>
-#include <xdbar/core.h>
-#include <xdbar/core/blocks.h>
 
 typedef struct {
   int x, width;
@@ -18,11 +18,13 @@ typedef struct ColorCache {
   struct ColorCache *prev, *next;
 } ColorCache;
 
-#define Attach(c)                                                              \
+#define ColorCacheAttach(c)                                                    \
+  /* Attach item on top of the 'drw.colorcache' linked list.*/                 \
   if ((c->prev = NULL, c->next = drw.colorcache))                              \
     drw.colorcache->prev = c;                                                  \
   drw.colorcache = c;
-#define Detach(c)                                                              \
+#define ColorCacheDetach(c)                                                    \
+  /* Detach item from the 'drw.colorcache' linked list.*/                      \
   (void)(c->prev ? (c->prev->next = c->next) : (drw.colorcache = c->next));    \
   (void)(c->next ? (c->next->prev = c->prev) : 0);
 
@@ -40,7 +42,7 @@ static struct Bar {
   XftColor foreground, background;
 } bar;
 
-static inline XftColor *get_cached_color(const char *);
+static inline XftColor *request_color(const char *);
 static inline int parse_box_string(const char *, char[32]);
 static inline void drw_init(const Config *);
 static inline void bar_init(const BarConfig *);
@@ -63,43 +65,42 @@ static Atom ATOM_WM_NAME;
 #define vis       (DefaultVisual(dpy, scr))
 #define cmap      (DefaultColormap(dpy, scr))
 
-// LRU cache (linear) which is fine, as the capacity is not that huge.
-static inline XftColor *get_cached_color(const char *colorname)
+// LRU - linear, which is fine, as the capacity is not that huge.
+static inline XftColor *request_color(const char *colorname)
 {
   static int capacity = 1 << 5;
   ColorCache *last    = NULL;
   for (ColorCache *c = drw.colorcache; c; last = c, c = c->next) {
     if (strcmp(c->name, colorname) == 0) {
-      // bring it to top.
-      Detach(c);
-      Attach(c);
+      ColorCacheDetach(c);
+      ColorCacheAttach(c);
       return &c->val;
     }
   }
   if (capacity) {
     capacity--;
   } else if (last) {
-    Detach(last);
+    ColorCacheDetach(last);
     XftColorFree(dpy, vis, cmap, &last->val);
     free(last);
   }
   ColorCache *color = (ColorCache *)malloc(sizeof(ColorCache));
   XftColorAllocName(dpy, vis, cmap, colorname, &color->val);
   strcpy(color->name, colorname);
-  Attach(color);
+  ColorCacheAttach(color);
   return &drw.colorcache->val;
 }
 
 static inline int parse_box_string(const char *val, char color[32])
 {
-  int ptr = 0, c = 0, nval = strlen(val), size = 0;
+  int cursor = 0, c = 0, nval = strlen(val), size = 0;
   memset(color, 0, 32);
-  while (ptr < nval && val[ptr] != ':')
-    color[c++] = val[ptr++];
-  if (val[ptr++] == ':')
-    while (ptr < nval && val[ptr] >= '0' && val[ptr] <= '9')
-      size = (size * 10) + val[ptr++] - '0';
-  if (ptr < nval - 1)
+  while (cursor < nval && val[cursor] != ':')
+    color[c++] = val[cursor++];
+  if (val[cursor++] == ':')
+    while (cursor < nval && val[cursor] >= '0' && val[cursor] <= '9')
+      size = (size * 10) + val[cursor++] - '0';
+  if (cursor < nval - 1)
     die("Invalid Box template string: %s\n", val);
   return size > 0 ? size : 1;
 }
@@ -166,7 +167,7 @@ static inline void xrender_bg(const Block *blk, const GlyphInfo *gi)
 {
   const Geometry *canvas_g = &bar.canvas_g;
   if (blk->tags[Bg] != NULL)
-    XftDrawRect(bar.canvas, get_cached_color(blk->tags[Bg]->val), gi->x,
+    XftDrawRect(bar.canvas, request_color(blk->tags[Bg]->val), gi->x,
                 canvas_g->y, gi->width, canvas_g->h);
 }
 
@@ -197,7 +198,7 @@ static inline void xrender_box(const Block *blk, const GlyphInfo *gi)
           bx = gi->x, by = canvas_g->y + canvas_g->h - size, bw = gi->width,
           bh = size;
         }
-        XftDrawRect(bar.canvas, get_cached_color(color), bx, by, bw, bh);
+        XftDrawRect(bar.canvas, request_color(color), bx, by, bw, bh);
       }
     }
   }
@@ -210,7 +211,7 @@ static void xrender_string(const Block *blk, const GlyphInfo *gi)
       blk->tags[Fn] != NULL ? atoi(blk->tags[Fn]->val) % drw.nfonts : 0;
   int starty = canvas_g->y + (canvas_g->h - drw.fonts[fnindex]->height) / 2 +
                drw.fonts[fnindex]->ascent;
-  XftColor *fg = blk->tags[Fg] != NULL ? get_cached_color(blk->tags[Fg]->val)
+  XftColor *fg = blk->tags[Fg] != NULL ? request_color(blk->tags[Fg]->val)
                                        : &bar.foreground;
   XftDrawStringUtf8(bar.canvas, fg, drw.fonts[fnindex], gi->x, starty,
                     (FcChar8 *)blk->text, blk->ntext);
@@ -222,6 +223,7 @@ static inline void execute_cmd(const char *cmd)
     return;
   if (dpy)
     close(ConnectionNumber(dpy));
+  setsid();
   // splitting space seperated 'cmd' string into an array of 'words'.
   char *words[50];
   size_t cursor = 0;
@@ -303,7 +305,7 @@ static bool onPropertyNotify(const XEvent *xevent, char *name)
   return false;
 }
 
-void xdb_setup()
+void clu_setup()
 {
   for (int i = 0; i < MAX_BLKS; ++i)
     drw.gis[Stdin][i] = drw.gis[Custom][i] = (GlyphInfo){0, 0};
@@ -339,7 +341,7 @@ void xdb_setup()
   XMapWindow(dpy, bar.window);
 }
 
-void xdb_clear(BlockType blktype)
+void clu_clear(BlockType blktype)
 {
   if (core->nblks[blktype]) {
     GlyphInfo *first = &drw.gis[blktype][0],
@@ -348,7 +350,7 @@ void xdb_clear(BlockType blktype)
   }
 }
 
-void xdb_render(BlockType blktype)
+void clu_render(BlockType blktype)
 {
   switch (blktype) {
   case Stdin:
@@ -368,7 +370,7 @@ void xdb_render(BlockType blktype)
   }
 }
 
-void xdb_toggle()
+void clu_toggle()
 {
   XWindowAttributes attrs;
   XGetWindowAttributes(dpy, bar.window, &attrs);
@@ -376,7 +378,7 @@ void xdb_toggle()
                                 : XUnmapWindow(dpy, bar.window);
 }
 
-xdb_event_t xdb_nextevent(char value[BLK_BUFFER_SIZE])
+CluEvent clu_nextevent(char value[BLK_BUFFER_SIZE])
 {
   XEvent e;
   if (XPending(dpy)) {
@@ -385,7 +387,7 @@ xdb_event_t xdb_nextevent(char value[BLK_BUFFER_SIZE])
     case MapNotify:
       XSelectInput(dpy, root, PropertyChangeMask);
       get_window_name(value);
-      return XDBReady;
+      return CLU_READY;
     case ButtonPress:
       onButtonPress(&e);
       break;
@@ -394,23 +396,22 @@ xdb_event_t xdb_nextevent(char value[BLK_BUFFER_SIZE])
     // is only if no compositor is running, something like 'picom').
     case Expose:
       FILL(0, 0, bar.window_g.w, bar.window_g.h);
-      return XDBReset;
+      return CLU_RESET;
     // root window events.
     case PropertyNotify:
       if (onPropertyNotify(&e, value))
-        return XDBNewValue;
+        return CLU_NEW_VALUE;
       break;
     }
   }
-  return XDBNoOp;
+  return CLU_NO_OP;
 }
 
-void xdb_cleanup(void)
+void clu_cleanup(void)
 {
-  while (drw.colorcache) {
-    XftColorFree(dpy, vis, cmap, &drw.colorcache->val);
-    ColorCache *stale = drw.colorcache;
-    drw.colorcache    = drw.colorcache->next;
+  for (ColorCache *stale; (stale = drw.colorcache);) {
+    drw.colorcache = drw.colorcache->next;
+    XftColorFree(dpy, vis, cmap, &stale->val);
     free(stale);
   }
   for (int fn = 0; fn < drw.nfonts; ++fn)

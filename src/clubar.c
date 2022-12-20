@@ -11,10 +11,10 @@
 
 #define CLEAR_AND_RENDER_WITH(blktype)                                         \
   /* @NOTE: Assuming lock/unlock is always successful (returns 0). */          \
-  for (int _c = (pthread_mutex_lock(&xdb_mutex), xdb_clear(blktype),           \
-                 pthread_mutex_unlock(&xdb_mutex), 1);                         \
-       _c; _c = (pthread_mutex_lock(&xdb_mutex), xdb_render(blktype),          \
-                 pthread_mutex_unlock(&xdb_mutex)))
+  for (int _c = (pthread_mutex_lock(&clu_mutex), clu_clear(blktype),           \
+                 pthread_mutex_unlock(&clu_mutex), 1);                         \
+       _c; _c = (pthread_mutex_lock(&clu_mutex), clu_render(blktype),          \
+                 pthread_mutex_unlock(&clu_mutex)))
 
 #define WITH_MUTEX(mutex_ptr)                                                  \
   /* @NOTE: Assuming lock/unlock is always successful (returns 0). */          \
@@ -25,7 +25,7 @@ typedef struct IOReader {
   char buffer[1 << 13];
   int start, end;
 } IOReader;
-#define IOReader() (IOReader){.start = 0, .end = 0};
+#define IOREADER() (IOReader){.start = 0, .end = 0};
 
 typedef struct ThreadSync {
   bool ready;
@@ -33,16 +33,16 @@ typedef struct ThreadSync {
   pthread_cond_t cond;
 } ThreadSync;
 // clang-format off
-#define ThreadSync()                                                            \
+#define THREADSYNC()                                                            \
   {false, PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER}
 #define THREADSYNC_WAIT(t)                                                      \
   WITH_MUTEX(&t.mutex) if (!t.ready) pthread_cond_wait(&t.cond, &t.mutex);
 #define THREADSYNC_SIGNAL(t)                                                    \
   WITH_MUTEX(&t.mutex) { t.ready = true; pthread_cond_signal(&t.cond); }
 
-static ThreadSync stdin_threadsync  = ThreadSync();
+static ThreadSync stdin_threadsync  = THREADSYNC();
 static pthread_mutex_t core_mutex   = PTHREAD_MUTEX_INITIALIZER, // core apis.
-                       xdb_mutex    = PTHREAD_MUTEX_INITIALIZER; // 'xdb_' apis.
+                       clu_mutex    = PTHREAD_MUTEX_INITIALIZER; // 'clu_' apis.
 static const struct timespec ts     = {.tv_nsec = 1e6 * 1000 / 120};
 // clang-format on
 
@@ -74,7 +74,7 @@ static inline char *readline(IOReader *io)
 static void *stdin_thread_handler()
 {
   THREADSYNC_WAIT(stdin_threadsync);
-  IOReader io = IOReader();
+  IOReader io = IOREADER();
   char *line;
   fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK);
   for (bool running = core->running; running; nanosleep(&ts, NULL)) {
@@ -94,34 +94,34 @@ int main(int argc, char **argv)
 {
   char buffer[BLK_BUFFER_SIZE];
   pthread_t stdin_thread;
-  xdb_event_t event = XDBNoOp;
+  CluEvent event;
 
   core->init(argc, argv);
   signal(SIGINT, quit);
   signal(SIGHUP, quit);
   signal(SIGTERM, quit);
-  signal(SIGUSR1, xdb_toggle);
+  signal(SIGUSR1, clu_toggle);
 
-  xdb_setup();
+  clu_setup();
   pthread_create(&stdin_thread, NULL, stdin_thread_handler, NULL);
   for (bool running = core->running; running; nanosleep(&ts, NULL)) {
-    switch (event = xdb_nextevent(buffer)) {
-    case XDBReady:
+    switch (event = clu_nextevent(buffer)) {
+    case CLU_READY:
       THREADSYNC_SIGNAL(stdin_threadsync); // fall through.
-    case XDBNewValue:
+    case CLU_NEW_VALUE:
       CLEAR_AND_RENDER_WITH(Custom) { core->update_blks(Custom, buffer); }
       break;
-    case XDBReset:
+    case CLU_RESET:
       CLEAR_AND_RENDER_WITH(Stdin);
       CLEAR_AND_RENDER_WITH(Custom);
       break;
-    case XDBNoOp:
+    case CLU_NO_OP:
     default:
       break;
     }
     WITH_MUTEX(&core_mutex) { running = core->running; }
   }
   pthread_join(stdin_thread, NULL);
-  xdb_cleanup();
+  clu_cleanup();
   return 0;
 }

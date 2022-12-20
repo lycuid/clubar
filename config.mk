@@ -1,5 +1,5 @@
-NAME:=xdbar
-VERSION:=0.4.3
+NAME:=clubar
+VERSION:=0.4.4
 BUILD:=.build
 ODIR:=$(BUILD)/cache
 IDIR:=src
@@ -22,11 +22,11 @@ ifneq ($(filter luaconfig,$(PLUGINS)),)
 endif
 
 FLAGS:=-Wall -Wextra -Wvla -pedantic -I$(IDIR) -O3 -ggdb -std=c99
-PREPROC:=-D_GNU_SOURCE                       \
-         -DNAME='"$(NAME)"'                  \
-         -DVERSION='"$(VERSION)"'            \
-         $(PLUGINS:%=-D__ENABLE_PLUGIN__%__)
+DEFINE:=-D_GNU_SOURCE                       \
+        -DNAME='"$(NAME)"'                  \
+        -DVERSION='"$(VERSION)"'            \
+        $(PLUGINS:%=-D__ENABLE_PLUGIN__%__)
 
 # In case 'pkg-config' is not installed, update LDFLAGS and CFLAGS accordingly.
-override CFLAGS+= $(FLAGS) $(PREPROC) $(shell pkg-config --cflags $(PKGS))
+override CFLAGS+= $(FLAGS) $(DEFINE) $(shell pkg-config --cflags $(PKGS))
 LDFLAGS=-lpthread $(shell pkg-config --libs $(PKGS))

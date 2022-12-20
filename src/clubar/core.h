@@ -1,12 +1,12 @@
 #ifndef __CORE_H__
 #define __CORE_H__
 
+#include <clubar/core/blocks.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <xdbar/core/blocks.h>
 
 #define MAX_BLKS (1 << 6)
 
@@ -18,11 +18,11 @@
   }
 
 typedef enum {
-  XDBReady,    // Window's canvas is ready and can now be drawn upon.
-  XDBNewValue, // New Value was just populated in the provided buffer.
-  XDBReset,    // Reset window canvas.
-  XDBNoOp,     // NoOP.
-} xdb_event_t;
+  CLU_READY,     // Window's canvas is ready and can now be drawn upon.
+  CLU_NEW_VALUE, // New Value was just populated in the provided buffer.
+  CLU_RESET,     // Reset window canvas.
+  CLU_NO_OP,     // NoOP.
+} CluEvent;
 typedef enum { Stdin, Custom } BlockType;
 
 typedef struct {
@@ -58,16 +58,16 @@ extern const struct Core {
  * being used. */
 
 // Setup and show window.
-void xdb_setup(void);
+void clu_setup(void);
 // Clear window canvas.
-void xdb_clear(BlockType);
+void clu_clear(BlockType);
 // render on the window canvas.
-void xdb_render(BlockType);
+void clu_render(BlockType);
 // toggle window visibility.
-void xdb_toggle();
+void clu_toggle();
 // get next window event.
-xdb_event_t xdb_nextevent(char[BLK_BUFFER_SIZE]);
+CluEvent clu_nextevent(char[BLK_BUFFER_SIZE]);
 // cleanup memory allocs and stuff and kill window.
-void xdb_cleanup(void);
+void clu_cleanup(void);
 
 #endif

@@ -5,10 +5,10 @@
 #include <string.h>
 #include <unistd.h>
 #ifdef __ENABLE_PLUGIN__xrmconfig__
-#include <xdbar/plugins/xrmconfig.h>
+#include <clubar/plugins/xrmconfig.h>
 #endif
 #ifdef __ENABLE_PLUGIN__luaconfig__
-#include <xdbar/plugins/luaconfig.h>
+#include <clubar/plugins/luaconfig.h>
 #endif
 
 static inline void argparse(int, char *const *);
@@ -42,7 +42,7 @@ static inline void argparse(int argc, char *const *argv)
       puts("  -c <config_file>");
       puts("        filepath for runtime configs (supports: lua).");
       puts("SIGNALS:");
-      puts("  USR1: toggle window visibility (e.g. pkill -USR1 xdbar).");
+      puts("  USR1: toggle window visibility (e.g. pkill -USR1 clubar).");
       exit(EXIT_SUCCESS);
     case 'v':
       puts(NAME ": v" VERSION);

@@ -1,12 +1,12 @@
 /* These are the compile time configs, which are loaded by default.
- * Any runtime configs (e.g 'xdbar.lua', '.Xresources'), if used, gets merged
+ * Any runtime configs (e.g 'clubar.lua', '.Xresources'), if used, gets merged
  * into these.
  *
  * Pros: Built into the program, rather than loading from external source,
  * everytime the program runs.
  * Cons: Recompilation is necessary, when updated.
  */
-#include <xdbar/core.h>
+#include <clubar/core.h>
 
 static const BarConfig barConfig = {
     .geometry   = {0, 768 - 32, 1366, 32},
