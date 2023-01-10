@@ -6,9 +6,10 @@
 #include <clubar/core/blocks.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 #include <unistd.h>
 
-typedef struct {
+typedef struct GlyphInfo {
   int x, width;
 } GlyphInfo;
 
@@ -136,12 +137,12 @@ static inline void bar_init(const BarConfig *barConfig)
 static inline void generate_stdin_gis(void)
 {
   XGlyphInfo extent;
-  int fnindex, startx = 0;
+  int fntindex, startx = 0;
   for (int i = 0; i < core->nblks[Stdin]; ++i) {
     const Block *blk = &core->blks[Stdin][i];
-    fnindex = blk->tags[Fn] ? atoi(blk->tags[Fn]->val) % drw.nfonts : 0;
-    XftTextExtentsUtf8(dpy, drw.fonts[fnindex], (FcChar8 *)blk->text,
-                       blk->ntext, &extent);
+    fntindex = blk->tags[Fn] ? atoi(blk->tags[Fn]->val) % drw.nfonts : 0;
+    XftTextExtentsUtf8(dpy, drw.fonts[fntindex], (FcChar8 *)blk->text,
+                       strlen(blk->text), &extent);
     drw.gis[Stdin][i].width = extent.xOff;
     drw.gis[Stdin][i].x     = startx + extent.x;
     startx += drw.gis[Stdin][i].width;
@@ -151,12 +152,12 @@ static inline void generate_stdin_gis(void)
 static inline void generate_custom_gis(void)
 {
   XGlyphInfo extent;
-  int fnindex, startx = bar.canvas_g.x + bar.canvas_g.w;
+  int fntindex, startx = bar.canvas_g.x + bar.canvas_g.w;
   for (int i = core->nblks[Custom] - 1; i >= 0; --i) {
     const Block *blk = &core->blks[Custom][i];
-    fnindex = blk->tags[Fn] ? atoi(blk->tags[Fn]->val) % drw.nfonts : 0;
-    XftTextExtentsUtf8(dpy, drw.fonts[fnindex], (FcChar8 *)blk->text,
-                       blk->ntext, &extent);
+    fntindex = blk->tags[Fn] ? atoi(blk->tags[Fn]->val) % drw.nfonts : 0;
+    XftTextExtentsUtf8(dpy, drw.fonts[fntindex], (FcChar8 *)blk->text,
+                       strlen(blk->text), &extent);
     drw.gis[Custom][i].width = extent.xOff;
     startx -= extent.x + extent.xOff;
     drw.gis[Custom][i].x = startx;
@@ -207,14 +208,14 @@ static inline void xrender_box(const Block *blk, const GlyphInfo *gi)
 static void xrender_string(const Block *blk, const GlyphInfo *gi)
 {
   Geometry *canvas_g = &bar.canvas_g;
-  int fnindex =
+  int fntindex =
       blk->tags[Fn] != NULL ? atoi(blk->tags[Fn]->val) % drw.nfonts : 0;
-  int starty = canvas_g->y + (canvas_g->h - drw.fonts[fnindex]->height) / 2 +
-               drw.fonts[fnindex]->ascent;
+  int starty = canvas_g->y + (canvas_g->h - drw.fonts[fntindex]->height) / 2 +
+               drw.fonts[fntindex]->ascent;
   XftColor *fg = blk->tags[Fg] != NULL ? request_color(blk->tags[Fg]->val)
                                        : &bar.foreground;
-  XftDrawStringUtf8(bar.canvas, fg, drw.fonts[fnindex], gi->x, starty,
-                    (FcChar8 *)blk->text, blk->ntext);
+  XftDrawStringUtf8(bar.canvas, fg, drw.fonts[fntindex], gi->x, starty,
+                    (FcChar8 *)blk->text, strlen(blk->text));
 }
 
 static inline void execute_cmd(const char *cmd)
@@ -360,7 +361,6 @@ void clu_render(BlockType blktype)
     generate_custom_gis();
     break;
   }
-
   for (int i = 0; i < core->nblks[blktype]; ++i) {
     const Block *blk    = &core->blks[blktype][i];
     const GlyphInfo *gi = &drw.gis[blktype][i];
@@ -387,7 +387,7 @@ CluEvent clu_nextevent(char value[BLK_BUFFER_SIZE])
     case MapNotify:
       XSelectInput(dpy, root, PropertyChangeMask);
       get_window_name(value);
-      return CLU_READY;
+      return CLU_Ready;
     case ButtonPress:
       onButtonPress(&e);
       break;
@@ -396,15 +396,15 @@ CluEvent clu_nextevent(char value[BLK_BUFFER_SIZE])
     // is only if no compositor is running, something like 'picom').
     case Expose:
       FILL(0, 0, bar.window_g.w, bar.window_g.h);
-      return CLU_RESET;
+      return CLU_Reset;
     // root window events.
     case PropertyNotify:
       if (onPropertyNotify(&e, value))
-        return CLU_NEW_VALUE;
+        return CLU_NewValue;
       break;
     }
   }
-  return CLU_NO_OP;
+  return CLU_NoOp;
 }
 
 void clu_cleanup(void)
@@ -414,8 +414,8 @@ void clu_cleanup(void)
     XftColorFree(dpy, vis, cmap, &stale->val);
     free(stale);
   }
-  for (int fn = 0; fn < drw.nfonts; ++fn)
-    XftFontClose(dpy, drw.fonts[fn]);
+  for (int fnt = 0; fnt < drw.nfonts; ++fnt)
+    XftFontClose(dpy, drw.fonts[fnt]);
   XftColorFree(dpy, vis, cmap, &bar.foreground);
   XftColorFree(dpy, vis, cmap, &bar.background);
   XftDrawDestroy(bar.canvas);

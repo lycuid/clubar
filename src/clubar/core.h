@@ -18,10 +18,10 @@
   }
 
 typedef enum {
-  CLU_READY,     // Window's canvas is ready and can now be drawn upon.
-  CLU_NEW_VALUE, // New Value was just populated in the provided buffer.
-  CLU_RESET,     // Reset window canvas.
-  CLU_NO_OP,     // NoOP.
+  CLU_Ready,    // Window's canvas is ready and can now be drawn upon.
+  CLU_NewValue, // New Value was just populated in the provided buffer.
+  CLU_Reset,    // Reset window canvas.
+  CLU_NoOp,     // NoOP.
 } CluEvent;
 typedef enum { Stdin, Custom } BlockType;
 
@@ -54,8 +54,8 @@ extern const struct Core {
   void (*stop_running)();
 } * core;
 
-/* These functions are supposed to be implemented by whichever 'backend' that is
- * being used. */
+/* These functions are supposed to be implemented by whichever 'frontend' that
+ * is being used. */
 
 // Setup and show window.
 void clu_setup(void);

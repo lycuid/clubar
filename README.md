@@ -52,7 +52,7 @@ SIGNALS:
 ```
 Requirements
 ------------
-  - *free* and *open source* Operating System (currently doesn't support \*BSD).
+  - ***free***, ***libre*** and ***open source*** Operating System (currently doesn't support \*BSD).
   - gnu make
   - libx11
   - libxft

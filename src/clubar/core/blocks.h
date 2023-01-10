@@ -9,7 +9,7 @@
  *
  * blocks = {
  *    {
- *       val:  " One ring ",
+ *       text: " One ring ",
  *       tags: {
  *          [Bg]  => { val: "#efefef", tmod_mask: 0x0, previous: NULL },
  *          [Fg]  => { val: "#090909", tmod_mask: 0x0, previous: NULL },
@@ -21,7 +21,7 @@
  *       },
  *    },
  *    {
- *       val:  " to rule them all!.",
+ *       text: " to rule them all!.",
  *       tags: {
  *          [Bg] => { val: "#efefef", previous: NULL },
  *          [Fg] => { val: "#090909", previous: NULL },
@@ -64,7 +64,6 @@ typedef struct Tag {
 } Tag;
 
 typedef struct {
-  int ntext;
   char text[BLK_BUFFER_SIZE];
   Tag *tags[NullTagName];
 } Block;

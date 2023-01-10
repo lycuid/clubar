@@ -4,7 +4,7 @@ BUILD:=.build
 ODIR:=$(BUILD)/cache
 IDIR:=src
 BIN:=$(BUILD)/bin/$(NAME)
-BACKEND:=$(NAME)/backend
+FRONTEND:=$(NAME)/frontend
 PREFIX:=/usr/local
 BINPREFIX:=$(PREFIX)/bin
 MANPREFIX:=$(PREFIX)/man/man1
@@ -21,7 +21,7 @@ ifneq ($(filter luaconfig,$(PLUGINS)),)
 	PKGS+= lua
 endif
 
-FLAGS:=-Wall -Wextra -Wvla -pedantic -I$(IDIR) -O3 -ggdb -std=c99
+FLAGS:=-Wall -Wextra -Wvla -pedantic -I$(IDIR) -Ofast -ggdb -std=c99
 DEFINE:=-D_GNU_SOURCE                       \
         -DNAME='"$(NAME)"'                  \
         -DVERSION='"$(VERSION)"'            \

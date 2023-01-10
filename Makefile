@@ -1,11 +1,11 @@
 include config.mk
 
 .PHONY: x11 wayland
-x11: $(OBJS) $(ODIR)/$(BACKEND)/x11.o
+x11: $(OBJS) $(ODIR)/$(FRONTEND)/x11.o
 	mkdir -p $(shell dirname $(BIN)) && $(CC) $(CFLAGS) $(LDFLAGS) -o $(BIN) $^
 
 # @TODO: Not Implemented.
-wayland: $(OBJS) $(ODIR)/$(BACKEND)/wayland.o
+wayland: $(OBJS) $(ODIR)/$(FRONTEND)/wayland.o
 	mkdir -p $(shell dirname $(BIN)) && $(CC) $(CFLAGS) $(LDFLAGS) -o $(BIN) $^
 
 $(ODIR)/%.o: $(IDIR)/%.c $(IDIR)/%.h

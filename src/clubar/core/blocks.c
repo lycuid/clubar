@@ -130,7 +130,7 @@ int parse(const char *text, TagName *tag_name, TagModifierMask *tmod_mask,
 static inline void createblk(Block *blk, Tag *tags[NullTagName],
                              const char *text, int ntext)
 {
-  blk->ntext = ntext;
+  memset(blk->text, 0, sizeof(blk->text));
   memcpy(blk->text, text, ntext);
   for (int i = 0; i < NullTagName; ++i)
     blk->tags[i] = tag_clone(tags[i]);

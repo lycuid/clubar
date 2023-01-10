@@ -49,13 +49,10 @@ static const struct timespec ts     = {.tv_nsec = 1e6 * 1000 / 120};
 static inline char *readline(IOReader *io)
 {
   ssize_t nread;
-  int size = sizeof(io->buffer);
+  static const int size = sizeof(io->buffer);
   // A 'line' was returned in previous iteration.
   if (io->start > 0 && io->buffer[io->start - 1] == 0) {
-    // shift string to beginning of the buffer.
-    ssize_t diff = io->end - io->start;
-    for (io->end = 0; io->end < diff; ++io->end)
-      io->buffer[io->end] = io->buffer[io->start + io->end];
+    memmove(io->buffer, io->buffer + io->start, io->end -= io->start);
     io->start = 0;
   }
   if (io->start == io->end) { // empty string.
@@ -65,7 +62,6 @@ static inline char *readline(IOReader *io)
       io->end += nread;
   }
   for (; io->start < io->end; ++io->start)
-    // try returning a 'line'.
     if (io->buffer[io->start] == '\n' && !(io->buffer[io->start++] = 0))
       return io->buffer;
   return NULL;
@@ -106,16 +102,16 @@ int main(int argc, char **argv)
   pthread_create(&stdin_thread, NULL, stdin_thread_handler, NULL);
   for (bool running = core->running; running; nanosleep(&ts, NULL)) {
     switch (event = clu_nextevent(buffer)) {
-    case CLU_READY:
-      THREADSYNC_SIGNAL(stdin_threadsync); // fall through.
-    case CLU_NEW_VALUE:
+    case CLU_Ready:
+      THREADSYNC_SIGNAL(stdin_threadsync); // fallthrough.
+    case CLU_NewValue:
       CLEAR_AND_RENDER_WITH(Custom) { core->update_blks(Custom, buffer); }
       break;
-    case CLU_RESET:
+    case CLU_Reset:
       CLEAR_AND_RENDER_WITH(Stdin);
       CLEAR_AND_RENDER_WITH(Custom);
       break;
-    case CLU_NO_OP:
+    case CLU_NoOp: // fallthrough.
     default:
       break;
     }
