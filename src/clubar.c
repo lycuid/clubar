@@ -22,7 +22,7 @@
        __cond     = pthread_mutex_unlock(mutex_ptr))
 
 typedef struct IOReader {
-  char buffer[1 << 13];
+  char buffer[BLK_BUFFER_SIZE * 3];
   int start, end;
 } IOReader;
 #define IOREADER() (IOReader){.start = 0, .end = 0};
@@ -43,7 +43,7 @@ typedef struct ThreadSync {
 static ThreadSync stdin_threadsync  = THREADSYNC();
 static pthread_mutex_t core_mutex   = PTHREAD_MUTEX_INITIALIZER, // core apis.
                        clu_mutex    = PTHREAD_MUTEX_INITIALIZER; // 'clu_' apis.
-static const struct timespec ts     = {.tv_nsec = 1e6 * 1000 / 120};
+static const struct timespec ts           = {.tv_nsec = 1e6 * 1000 / 120};
 // clang-format on
 
 static inline char *readline(IOReader *io)
@@ -56,7 +56,7 @@ static inline char *readline(IOReader *io)
     io->start = 0;
   }
   if (io->start == io->end) { // empty string.
-    if (io->end == size)      // reset buffer.
+    if (io->end == size)
       io->start = io->end = 0;
     if ((nread = read(STDIN_FILENO, io->buffer + io->end, size - io->end)) > 0)
       io->end += nread;
@@ -67,7 +67,7 @@ static inline char *readline(IOReader *io)
   return NULL;
 }
 
-static void *stdin_thread_handler()
+static void *stdin_thread_handler(__attribute__((unused)) void *_)
 {
   THREADSYNC_WAIT(stdin_threadsync);
   IOReader io = IOREADER();

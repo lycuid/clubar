@@ -34,7 +34,7 @@
 
 #include <stdint.h>
 
-#define BLK_BUFFER_SIZE /* minimum can be 'unsigned char' size. */ (1 << 10)
+#define BLK_BUFFER_SIZE (1 << 10)
 
 #define TagStart "<"
 #define TagEnd   ">"

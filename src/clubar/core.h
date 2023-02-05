@@ -51,8 +51,8 @@ extern const struct Core {
   Config config;
   void (*init)(int argc, char *const *argv);
   void (*update_blks)(BlockType, const char *);
-  void (*stop_running)();
-} * core;
+  void (*stop_running)(void);
+} *core;
 
 /* These functions are supposed to be implemented by whichever 'frontend' that
  * is being used. */
@@ -64,7 +64,7 @@ void clu_clear(BlockType);
 // render on the window canvas.
 void clu_render(BlockType);
 // toggle window visibility.
-void clu_toggle();
+void clu_toggle(int);
 // get next window event.
 CluEvent clu_nextevent(char[BLK_BUFFER_SIZE]);
 // cleanup memory allocs and stuff and kill window.

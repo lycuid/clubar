@@ -51,7 +51,7 @@ static inline void load_bar_config(lua_State *L, BarConfig *barConfig)
   GetField(L, barindex, "topbar", &topbar, lua_toboolean);
   barConfig->topbar = topbar;
 
-  int size = 4;
+#define size 4
   int ints[size];
   const char *g_members[4] = {"x", "y", "w", "h"};
   const char *members[4]   = {"left", "right", "top", "bottom"};
@@ -67,6 +67,7 @@ static inline void load_bar_config(lua_State *L, BarConfig *barConfig)
 
   if (GetTableAsIntArray(L, barindex, "margin", members, ints, size))
     memcpy(&barConfig->margin, ints, size * sizeof(int));
+#undef size
 }
 
 static inline void load_font_config(lua_State *L, Config *luaConfig)

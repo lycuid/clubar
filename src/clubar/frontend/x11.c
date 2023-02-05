@@ -185,19 +185,21 @@ static inline void xrender_box(const Block *blk, const GlyphInfo *gi)
       int bx = canvas_g->x, by = canvas_g->y, bw = 0, bh = 0;
       if (box->tmod_mask & (1 << mods[e])) {
         switch (mods[e]) {
-        case Left:
+        case Left: {
           bx = gi->x, bw = size, bh = canvas_g->h;
-          break;
-        case Right:
+        } break;
+        case Right: {
           bx = gi->x + gi->width - size, bw = size, bh = canvas_g->h;
-          break;
-        case Top:
+        } break;
+        case Top: {
           bx = gi->x, bw = gi->width, bh = size;
-          break;
-        case Bottom: // fall through.
-        default:
+        } break;
+        case Bottom: {
           bx = gi->x, by = canvas_g->y + canvas_g->h - size, bw = gi->width,
           bh = size;
+        } break;
+        default:
+          break;
         }
         XftDrawRect(bar.canvas, request_color(color), bx, by, bw, bh);
       }
@@ -306,7 +308,7 @@ static bool onPropertyNotify(const XEvent *xevent, char *name)
   return false;
 }
 
-void clu_setup()
+void clu_setup(void)
 {
   for (int i = 0; i < MAX_BLKS; ++i)
     drw.gis[Stdin][i] = drw.gis[Custom][i] = (GlyphInfo){0, 0};
@@ -370,7 +372,7 @@ void clu_render(BlockType blktype)
   }
 }
 
-void clu_toggle()
+void clu_toggle(__attribute__((unused)) int _arg)
 {
   XWindowAttributes attrs;
   XGetWindowAttributes(dpy, bar.window, &attrs);
