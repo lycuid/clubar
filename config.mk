@@ -1,5 +1,5 @@
 NAME:=clubar
-VERSION:=0.4.5
+VERSION:=0.4.6
 BUILD:=.build
 ODIR:=$(BUILD)/cache
 IDIR:=src
@@ -14,6 +14,7 @@ PLUGINS=
 SRC=$(IDIR)/$(NAME).c                        \
     $(IDIR)/$(NAME)/core.c                   \
     $(IDIR)/$(NAME)/core/blocks.c            \
+    $(IDIR)/$(NAME)/core/tags.c              \
     $(PLUGINS:%=$(IDIR)/$(NAME)/plugins/%.c)
 
 OBJS=$(SRC:$(IDIR)/%.c=$(ODIR)/%.o)

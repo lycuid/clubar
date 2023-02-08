@@ -15,7 +15,7 @@ static inline void argparse(int, char *const *);
 static inline void create_config(void);
 void core_init(int argc, char *const *argv);
 void core_update_blks(BlockType, const char *);
-void core_stop_running();
+void core_stop_running(void);
 
 static Block blks[2][MAX_BLKS];
 
@@ -83,4 +83,4 @@ void core_update_blks(BlockType blktype, const char *buffer)
   local.nblks[blktype] = blks_create(local.blks[blktype], buffer);
 }
 
-void core_stop_running() { local.running = false; }
+void core_stop_running(void) { local.running = false; }

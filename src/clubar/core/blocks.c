@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define FreeTag(tag_ptr) while ((tag_ptr = tag_pop(tag_ptr)))
+#define RemoveTag(tag_ptr) while ((tag_ptr = tag_remove(tag_ptr)))
 
 typedef struct TagToken {
   bool closing : 1;
@@ -34,51 +34,11 @@ typedef struct Parser {
   (p_peek(p) && memcmp(str, p_buffer(p), (len)) == 0 &&                        \
    p_advance_by(p, (len)) > 0)
 
-#define REPR(token) [token] = #token
-static const char *const TagNameRepr[NullTagName] = {
-    REPR(Fn),   REPR(Fg),   REPR(Bg),    REPR(Box),   REPR(BtnL),
-    REPR(BtnM), REPR(BtnR), REPR(ScrlU), REPR(ScrlD),
-};
-static const char *const TagModifierRepr[NullTagModifier] = {
-    REPR(Shift), REPR(Ctrl),  REPR(Super), REPR(Alt),
-    REPR(Left),  REPR(Right), REPR(Top),   REPR(Bottom),
-};
-#undef REPR
-
-static inline Tag *tag_new(Tag *, const char *, TagModifierMask);
-static inline Tag *tag_clone(const Tag *);
-static inline Tag *tag_pop(Tag *);
 static inline TagName parse_tagname(Parser *);
 static inline TagModifierMask parse_tagmodifier(Parser *, TagName);
 static inline bool parse_tag(Parser *, TagToken *);
 static inline void createblk(Block *, Tag *const[NullTagName], const char *,
                              int);
-
-static inline Tag *tag_new(Tag *previous, const char *val,
-                           TagModifierMask tmod_mask)
-{
-  Tag *tag = (Tag *)malloc(sizeof(Tag));
-  strcpy(tag->val, val);
-  tag->tmod_mask = tmod_mask;
-  tag->previous  = previous;
-  return tag;
-}
-
-static inline Tag *tag_clone(const Tag *root)
-{
-  if (!root)
-    return NULL;
-  return tag_new(tag_clone(root->previous), root->val, root->tmod_mask);
-}
-
-static inline Tag *tag_pop(Tag *stale)
-{
-  if (stale == NULL)
-    return NULL;
-  Tag *tag = stale->previous;
-  free(stale);
-  return tag;
-}
 
 static inline TagName parse_tagname(Parser *parser)
 {
@@ -158,17 +118,17 @@ int blks_create(Block *blks, const char *line)
       nbuf = 0;
       tags[token.tag_name] =
           token.closing
-              ? tag_pop(tags[token.tag_name])
-              : tag_new(tags[token.tag_name], token.val, token.tmod_mask);
+              ? tag_remove(tags[token.tag_name])
+              : tag_create(tags[token.tag_name], token.val, token.tmod_mask);
     } else {
       p_rollback_to(&parser, c);
       buf[nbuf++] = p_next(&parser);
     }
   }
-  if (nbuf)
+  if (nbuf) // only create a block, if some text exits.
     createblk(&blks[nblks++], tags, buf, nbuf);
   for (TagName name = 0; name < NullTagName; ++name)
-    FreeTag(tags[name]);
+    RemoveTag(tags[name]);
   return nblks;
 }
 
@@ -176,5 +136,5 @@ void blks_free(Block *blks, int nblks)
 {
   for (int b = 0; b < nblks; ++b)
     for (TagName tag_name = 0; tag_name < NullTagName; ++tag_name)
-      FreeTag(blks[b].tags[tag_name]);
+      RemoveTag(blks[b].tags[tag_name]);
 }
