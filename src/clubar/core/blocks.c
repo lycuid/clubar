@@ -103,37 +103,32 @@ static inline TagModifierMask parse_tagmodifier(Parser *parser, TagName name)
 
 static inline bool parse_tag(Parser *p, TagToken *token)
 {
-#define TRY(expr)                                                              \
-  if (!(expr)) {                                                               \
-    p_rollback_to(p, previous_cursor);                                         \
-    return false;                                                              \
-  }
-  TOKEN_CLEAR(token);
-  int previous_cursor = p->cursor;
+#define TRYP(expr)                                                             \
+  if (!(expr))                                                                 \
+    return false;
 
+  TOKEN_CLEAR(token);
   static const size_t ntag_start = sizeof(TagStart) - 1,
                       ntag_end   = sizeof(TagEnd) - 1;
 
-  TRY(p_consume_string(p, TagStart, ntag_start));
+  TRYP(p_consume_string(p, TagStart, ntag_start));
   token->closing = p_consume(p, '/');
-  TRY((token->tag_name = parse_tagname(p)) != NullTagName);
+  TRYP((token->tag_name = parse_tagname(p)) != NullTagName);
 
   if (!token->closing) {
     if (p_consume(p, ':')) {
       int mod = NullTagModifier;
       do {
-        TRY((mod = parse_tagmodifier(p, token->tag_name)) != NullTagModifier);
+        TRYP((mod = parse_tagmodifier(p, token->tag_name)) != NullTagModifier);
         token->tmod_mask |= (1 << mod);
       } while (p_consume(p, '|'));
     }
-    TRY(p_consume(p, '='));
+    TRYP(p_consume(p, '='));
     for (int i = 0; *p_peek(p) != TagEnd[0]; ++i)
       token->val[i] = p_next(p);
   }
-
-  TRY(p_consume_string(p, TagEnd, ntag_end));
-  return true;
-#undef TRY
+  return p_consume_string(p, TagEnd, ntag_end);
+#undef TRYP
 }
 
 static inline void createblk(Block *blk, Tag *const tags[NullTagName],
@@ -154,10 +149,10 @@ int blks_create(Block *blks, const char *line)
   TagToken token;
   Tag *tags[NullTagName] = {0};
 
-  while (p_peek(&parser)) {
-    bool parsed        = parse_tag(&parser, &token);
-    bool invalid_close = token.closing && tags[token.tag_name] == NULL;
-    if (parsed && !invalid_close) {
+  for (int c = parser.cursor; p_peek(&parser); c = parser.cursor) {
+    bool parse_success = parse_tag(&parser, &token),
+         invalid_close = token.closing && tags[token.tag_name] == NULL;
+    if (parse_success && !invalid_close) {
       if (nbuf) // only create a block, if some text exits.
         createblk(&blks[nblks++], tags, buf, nbuf);
       nbuf = 0;
@@ -166,6 +161,7 @@ int blks_create(Block *blks, const char *line)
               ? tag_pop(tags[token.tag_name])
               : tag_new(tags[token.tag_name], token.val, token.tmod_mask);
     } else {
+      p_rollback_to(&parser, c);
       buf[nbuf++] = p_next(&parser);
     }
   }
