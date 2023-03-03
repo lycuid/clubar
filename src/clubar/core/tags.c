@@ -1,38 +1,38 @@
 #include "tags.h"
 #include <string.h>
 
-#define TAG_ALLOCATOR_CAPACITY (1 << 5)
+#define TAG_STASH_CAPACITY (1 << 5)
 
-// lifetime of this struct is the entire runtime of the application.
-// no need to explicitly free pointers... i guess.
-static struct {
-  Tag *tags;
-  size_t size;
-} allocator = {.tags = NULL, .size = 0};
+// lifetime for this is going to be the entire runtime of the application, (no
+// need to explicitly free).
+static Tag *stash = NULL;
 
 static inline Tag *tag_request(void)
 {
-  if (!allocator.tags && !(allocator.size = 0))
-    return (Tag *)malloc(sizeof(Tag));
-  Tag *tag       = allocator.tags;
-  allocator.tags = tag->previous, tag->previous = NULL, allocator.size--;
+  if (!stash)
+    return malloc(sizeof(Tag));
+  Tag *tag = stash;
+  stash    = stash->previous;
+  memset(tag->val, 0, sizeof(tag->val));
+  tag->previous = NULL, tag->tmod_mask = 0x0;
   return tag;
 }
 
 static inline void tag_release(Tag *tag)
 {
-  if (tag) {
-    if (allocator.size == TAG_ALLOCATOR_CAPACITY)
-      free(tag);
-    else
-      tag->previous = allocator.tags, allocator.tags = tag, allocator.size++;
-  }
+  // Storing tag allocator size in 'tmod_mask'.
+  tag->tmod_mask = stash ? stash->tmod_mask + 1 : 0;
+  if (tag->tmod_mask == TAG_STASH_CAPACITY)
+    free(tag);
+  else
+    tag->previous = stash, stash = tag;
 }
 
 Tag *tag_create(Tag *previous, const char *val, TagModifierMask tmod_mask)
 {
   Tag *tag = tag_request();
-  strcpy(tag->val, val), tag->tmod_mask = tmod_mask, tag->previous = previous;
+  strcpy(tag->val, val);
+  tag->tmod_mask = tmod_mask, tag->previous = previous;
   return tag;
 }
 

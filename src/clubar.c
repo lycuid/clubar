@@ -69,36 +69,39 @@ static inline char *readline(IOReader *io)
 }
 
 static void *stdin_thread_handler(__attribute__((unused)) void *_)
-{
+{ // clang-format off
   THREADSYNC_WAIT(stdin_threadsync);
   IOReader io = IOREADER();
   char *line;
   fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK);
   for (bool running = core->running; running; nanosleep(&ts, NULL)) {
-    if ((line = readline(&io)) && strlen(line) > 0)
-      CLEAR_AND_RENDER_WITH(Stdin) { core->update_blks(Stdin, line); }
+    if ((line = readline(&io)) && strlen(line) > 0) {
+      CLEAR_AND_RENDER_WITH(Stdin) {
+        WITH_MUTEX(&core_mutex) { core->update_blks(Stdin, line); }
+      }
+    }
     WITH_MUTEX(&core_mutex) { running = core->running; }
   }
   pthread_exit(0);
-}
+} // clang-format on
 
 static void sighandler(int sig)
 { // clang-format off
   if (signal(sig, sighandler) == sighandler) {
     switch (sig) {
-    case SIGCHLD: { while (wait(NULL) > 0); } break;
-    case SIGQUIT: // fallthrough.
-    case SIGINT:  // fallthrough.
-    case SIGHUP:  // fallthrough.
-    case SIGTERM: { WITH_MUTEX(&core_mutex) { core->stop_running(); } } break;
-    case SIGUSR1: { clu_toggle(); } break;
-    default: break;
+      case SIGCHLD: { while (wait(NULL) > 0); } break;
+      case SIGQUIT: // fallthrough.
+      case SIGINT:  // fallthrough.
+      case SIGHUP:  // fallthrough.
+      case SIGTERM: { WITH_MUTEX(&core_mutex) { core->stop_running(); } } break;
+      case SIGUSR1: { clu_toggle(); } break;
+      default: break;
     }
   }
 } // clang-format on
 
 int main(int argc, char **argv)
-{
+{ // clang-format off
   char buffer[BLK_BUFFER_SIZE];
   pthread_t stdin_thread;
   CluEvent event;
@@ -115,23 +118,21 @@ int main(int argc, char **argv)
   pthread_create(&stdin_thread, NULL, stdin_thread_handler, NULL);
   for (bool running = core->running; running; nanosleep(&ts, NULL)) {
     switch (event = clu_nextevent(buffer)) {
-    case CLU_Ready: {
-      THREADSYNC_SIGNAL(stdin_threadsync);
-    } // fallthrough.
+    case CLU_Ready: THREADSYNC_SIGNAL(stdin_threadsync); // fallthrough.
     case CLU_NewValue: {
-      CLEAR_AND_RENDER_WITH(Custom) { core->update_blks(Custom, buffer); }
+      CLEAR_AND_RENDER_WITH(Custom) {
+        WITH_MUTEX(&core_mutex) { core->update_blks(Custom, buffer); }
+      }
     } break;
     case CLU_Reset: {
       CLEAR_AND_RENDER_WITH(Stdin);
       CLEAR_AND_RENDER_WITH(Custom);
     } break;
-    case CLU_NoOp: // fallthrough.
-    default:
-      break;
+    case CLU_NoOp: break;
     }
     WITH_MUTEX(&core_mutex) { running = core->running; }
   }
   pthread_join(stdin_thread, NULL);
   clu_cleanup();
   return 0;
-}
+} // clang-format on

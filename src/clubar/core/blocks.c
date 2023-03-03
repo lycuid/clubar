@@ -64,9 +64,8 @@ static inline TagModifierMask parse_tagmodifier(Parser *parser, TagName name)
 static inline bool parse_tag(Parser *p, TagToken *token)
 {
 #define TRYP(expr)                                                             \
-  if (!(expr) && (p_rollback_to(p, cursor), true))                             \
+  if (!(expr))                                                                 \
     return false;
-  size_t cursor = p->cursor;
   TOKEN_CLEAR(token);
   static const size_t ntag_start = sizeof(TagStart) - 1,
                       ntag_end   = sizeof(TagEnd) - 1;
@@ -109,7 +108,7 @@ int blks_create(Block *blks, const char *line)
   TagToken token;
   Tag *tags[NullTagName] = {0};
 
-  while (p_peek(&parser)) {
+  for (int c = parser.cursor; p_peek(&parser); c = parser.cursor) {
     bool parse_success = parse_tag(&parser, &token),
          invalid_close = token.closing && tags[token.tag_name] == NULL;
     if (parse_success && !invalid_close) {
@@ -121,6 +120,7 @@ int blks_create(Block *blks, const char *line)
               ? tag_remove(tags[token.tag_name])
               : tag_create(tags[token.tag_name], token.val, token.tmod_mask);
     } else {
+      p_rollback_to(&parser, c);
       buf[nbuf++] = p_next(&parser);
     }
   }
