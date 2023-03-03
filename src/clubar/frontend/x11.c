@@ -19,15 +19,17 @@ typedef struct ColorCache {
   struct ColorCache *prev, *next;
 } ColorCache;
 
-#define ColorCacheAttach(c)                                                    \
-  /* Attach item on top of the 'drw.colorcache' linked list.*/                 \
-  if ((c->prev = NULL, c->next = drw.colorcache))                              \
-    drw.colorcache->prev = c;                                                  \
-  drw.colorcache = c;
-#define ColorCacheDetach(c)                                                    \
-  /* Detach item from the 'drw.colorcache' linked list.*/                      \
-  (void)(c->prev ? (c->prev->next = c->next) : (drw.colorcache = c->next));    \
-  (void)(c->next ? (c->next->prev = c->prev) : 0);
+#define COLOR_CACHE_ATTACH(c)                                                  \
+  { /* Attach item on top of the 'drw.colorcache' linked list.*/               \
+    if ((c->prev = NULL, c->next = drw.colorcache))                            \
+      drw.colorcache->prev = c;                                                \
+    drw.colorcache = c;                                                        \
+  }
+#define COLOR_CACHE_DETACH(c)                                                  \
+  { /* Detach item from the 'drw.colorcache' linked list.*/                    \
+    (void)(c->prev ? (c->prev->next = c->next) : (drw.colorcache = c->next));  \
+    (void)(c->next ? (c->next->prev = c->prev) : 0);                           \
+  }
 
 static struct Draw {
   int nfonts;
@@ -73,22 +75,22 @@ static inline XftColor *request_color(const char *colorname)
   ColorCache *last    = NULL;
   for (ColorCache *c = drw.colorcache; c; last = c, c = c->next) {
     if (strcmp(c->name, colorname) == 0) {
-      ColorCacheDetach(c);
-      ColorCacheAttach(c);
+      COLOR_CACHE_DETACH(c);
+      COLOR_CACHE_ATTACH(c);
       return &c->val;
     }
   }
   if (capacity) {
     capacity--;
   } else if (last) {
-    ColorCacheDetach(last);
+    COLOR_CACHE_DETACH(last);
     XftColorFree(dpy, vis, cmap, &last->val);
     free(last);
   }
   ColorCache *color = (ColorCache *)malloc(sizeof(ColorCache));
   XftColorAllocName(dpy, vis, cmap, colorname, &color->val);
   strcpy(color->name, colorname);
-  ColorCacheAttach(color);
+  COLOR_CACHE_ATTACH(color);
   return &drw.colorcache->val;
 }
 
@@ -372,7 +374,7 @@ void clu_render(BlockType blktype)
   }
 }
 
-void clu_toggle(__attribute__((unused)) int _arg)
+void clu_toggle(void)
 {
   XWindowAttributes attrs;
   XGetWindowAttributes(dpy, bar.window, &attrs);

@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -81,10 +82,20 @@ static void *stdin_thread_handler(__attribute__((unused)) void *_)
   pthread_exit(0);
 }
 
-static void quit(__attribute__((unused)) int _arg)
-{
-  WITH_MUTEX(&core_mutex) { core->stop_running(); }
-}
+static void sighandler(int sig)
+{ // clang-format off
+  if (signal(sig, sighandler) == sighandler) {
+    switch (sig) {
+    case SIGCHLD: { while (wait(NULL) > 0); } break;
+    case SIGQUIT: // fallthrough.
+    case SIGINT:  // fallthrough.
+    case SIGHUP:  // fallthrough.
+    case SIGTERM: { WITH_MUTEX(&core_mutex) { core->stop_running(); } } break;
+    case SIGUSR1: { clu_toggle(); } break;
+    default: break;
+    }
+  }
+} // clang-format on
 
 int main(int argc, char **argv)
 {
@@ -93,24 +104,27 @@ int main(int argc, char **argv)
   CluEvent event;
 
   core->init(argc, argv);
-  signal(SIGINT, quit);
-  signal(SIGHUP, quit);
-  signal(SIGTERM, quit);
-  signal(SIGUSR1, clu_toggle);
+  sighandler(SIGCHLD);
+  sighandler(SIGQUIT);
+  sighandler(SIGINT);
+  sighandler(SIGHUP);
+  sighandler(SIGTERM);
+  sighandler(SIGUSR1);
 
   clu_setup();
   pthread_create(&stdin_thread, NULL, stdin_thread_handler, NULL);
   for (bool running = core->running; running; nanosleep(&ts, NULL)) {
     switch (event = clu_nextevent(buffer)) {
-    case CLU_Ready:
-      THREADSYNC_SIGNAL(stdin_threadsync); // fallthrough.
-    case CLU_NewValue:
+    case CLU_Ready: {
+      THREADSYNC_SIGNAL(stdin_threadsync);
+    } // fallthrough.
+    case CLU_NewValue: {
       CLEAR_AND_RENDER_WITH(Custom) { core->update_blks(Custom, buffer); }
-      break;
-    case CLU_Reset:
+    } break;
+    case CLU_Reset: {
       CLEAR_AND_RENDER_WITH(Stdin);
       CLEAR_AND_RENDER_WITH(Custom);
-      break;
+    } break;
     case CLU_NoOp: // fallthrough.
     default:
       break;

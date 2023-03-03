@@ -5,11 +5,11 @@ A minialistic, lightweight, customizable statusbar (formerly *xdbar*), inspired 
 Rendering styled/clickable text, is inspired by xmobar's approach of wrapping text in XML like *tags*.  
 Populating statusbar is inspired by dwm statusbar's approach of using the root window's `WM_NAME` attribute text.
 
-![dark.png](https://raw.githubusercontent.com/cluless-grid/assets/master/clubar/dark.png)
+![dark.png](https://raw.githubusercontent.com/lycuid/assets/master/clubar/dark.png)
 
 ----
 
-![light.png](https://raw.githubusercontent.com/cluless-grid/assets/master/clubar/light.png)
+![light.png](https://raw.githubusercontent.com/lycuid/assets/master/clubar/light.png)
 
 Description
 -----------

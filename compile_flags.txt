@@ -3,12 +3,11 @@
 -Wvla
 -pedantic
 -Isrc
--O3
+-Ofast
 -ggdb
--std=c99
 -D_GNU_SOURCE
 -DNAME="clubar"
--DVERSION="0.4.4"
+-DVERSION="0.4.6"
 -I/usr/include/freetype2
 -I/usr/include/libpng16
 -I/usr/include/harfbuzz

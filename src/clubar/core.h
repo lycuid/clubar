@@ -64,7 +64,7 @@ void clu_clear(BlockType);
 // render on the window canvas.
 void clu_render(BlockType);
 // toggle window visibility.
-void clu_toggle(int);
+void clu_toggle(void);
 // get next window event.
 CluEvent clu_nextevent(char[BLK_BUFFER_SIZE]);
 // cleanup memory allocs and stuff and kill window.

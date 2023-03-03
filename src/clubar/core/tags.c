@@ -38,7 +38,7 @@ Tag *tag_create(Tag *previous, const char *val, TagModifierMask tmod_mask)
 
 Tag *tag_remove(Tag *stale)
 {
-  if (stale == NULL)
+  if (!stale)
     return NULL;
   Tag *tag = stale->previous;
   tag_release(stale);
