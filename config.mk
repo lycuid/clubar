@@ -22,7 +22,7 @@ ifneq ($(filter luaconfig,$(PLUGINS)),)
 	PKGS+= lua
 endif
 
-FLAGS:=-Wall -Wextra -Wvla -pedantic -I$(IDIR) -Ofast -ggdb -std=c99
+FLAGS:=-Wall -Wextra -Wvla -pedantic -I$(IDIR) -Ofast -ggdb
 DEFINE:=-D_GNU_SOURCE                       \
         -DNAME='"$(NAME)"'                  \
         -DVERSION='"$(VERSION)"'            \

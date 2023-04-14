@@ -5,7 +5,6 @@
 -Isrc
 -Ofast
 -ggdb
--std=c99
 -D_GNU_SOURCE
 -DNAME="clubar"
 -DVERSION="0.4.7"
