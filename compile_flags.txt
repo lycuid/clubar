@@ -7,7 +7,7 @@
 -ggdb
 -D_GNU_SOURCE
 -DNAME="clubar"
--DVERSION="0.4.7"
+-DVERSION="0.5.0"
 -I/usr/include/freetype2
 -I/usr/include/libpng16
 -I/usr/include/harfbuzz

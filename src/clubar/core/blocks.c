@@ -83,7 +83,7 @@ static inline bool parse_tag(Parser *p, TagToken *token)
       } while (p_consume(p, '|'));
     }
     TRYP(p_consume(p, '='));
-    for (int i = 0; *p_peek(p) != TagEnd[0]; ++i)
+    for (int i = 0; p_peek(p) && *p_peek(p) != TagEnd[0]; ++i)
       token->val[i] = p_next(p);
   }
   return p_consume_string(p, TagEnd, ntag_end);

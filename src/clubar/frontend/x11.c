@@ -19,17 +19,24 @@ typedef struct ColorCache {
   struct ColorCache *prev, *next;
 } ColorCache;
 
-#define COLOR_CACHE_ATTACH(c)                                                  \
-  { /* Attach item on top of the 'drw.colorcache' linked list.*/               \
+#define CC_ATTACH(c)                                                           \
+  do { /* Attach item on top of the 'drw.colorcache' linked list.*/            \
     if ((c->prev = NULL, c->next = drw.colorcache))                            \
       drw.colorcache->prev = c;                                                \
     drw.colorcache = c;                                                        \
-  }
-#define COLOR_CACHE_DETACH(c)                                                  \
-  { /* Detach item from the 'drw.colorcache' linked list.*/                    \
+  } while (0)
+#define CC_DETACH(c)                                                           \
+  do { /* Detach item from the 'drw.colorcache' linked list.*/                 \
     (void)(c->prev ? (c->prev->next = c->next) : (drw.colorcache = c->next));  \
     (void)(c->next ? (c->next->prev = c->prev) : 0);                           \
-  }
+  } while (0)
+
+#define CC_FREE(c)                                                             \
+  do {                                                                         \
+    CC_DETACH(c);                                                              \
+    XftColorFree(dpy, vis, cmap, &(c)->val);                                   \
+    free(c);                                                                   \
+  } while (0)
 
 static struct Draw {
   int nfonts;
@@ -45,7 +52,7 @@ static struct Bar {
   XftColor foreground, background;
 } bar;
 
-static inline XftColor *request_color(const char *);
+static XftColor *request_color(const char *);
 static inline int parse_box_string(const char *, char[32]);
 static inline void drw_init(const Config *);
 static inline void bar_init(const BarConfig *);
@@ -62,35 +69,42 @@ static bool onPropertyNotify(const XEvent *, char *);
 static Display *dpy;
 static Atom ATOM_WM_NAME;
 
-#define FILL(...) XftDrawRect(bar.canvas, &bar.background, __VA_ARGS__)
-#define root      (DefaultRootWindow(dpy))
-#define scr       (DefaultScreen(dpy))
-#define vis       (DefaultVisual(dpy, scr))
-#define cmap      (DefaultColormap(dpy, scr))
+#define FILL(...)         XftDrawRect(bar.canvas, &bar.background, __VA_ARGS__)
+#define root              (DefaultRootWindow(dpy))
+#define scr               (DefaultScreen(dpy))
+#define vis               (DefaultVisual(dpy, scr))
+#define cmap              (DefaultColormap(dpy, scr))
+#define alloc_color(p, c) XftColorAllocName(dpy, vis, cmap, c, p)
+#define free_color(p)                                                          \
+  do {                                                                         \
+    XftColorFree(dpy, vis, cmap, &(p)->val);                                   \
+    free(p);                                                                   \
+  } while (0)
 
 // LRU - linear, which is fine, as the capacity is not that huge.
-static inline XftColor *request_color(const char *colorname)
+static XftColor *request_color(const char *colorname)
 {
   static int capacity = 1 << 5;
   ColorCache *last    = NULL;
   for (ColorCache *c = drw.colorcache; c; last = c, c = c->next) {
     if (strcmp(c->name, colorname) == 0) {
-      COLOR_CACHE_DETACH(c);
-      COLOR_CACHE_ATTACH(c);
+      CC_DETACH(c);
+      CC_ATTACH(c);
       return &c->val;
     }
   }
-  if (capacity) {
+  if (capacity)
     capacity--;
-  } else if (last) {
-    COLOR_CACHE_DETACH(last);
-    XftColorFree(dpy, vis, cmap, &last->val);
-    free(last);
-  }
+  else if (last)
+    CC_FREE(last);
+
+  XftColor xft_color;
+  if (!alloc_color(&xft_color, colorname))
+    return &bar.foreground;
   ColorCache *color = (ColorCache *)malloc(sizeof(ColorCache));
-  XftColorAllocName(dpy, vis, cmap, colorname, &color->val);
+  memmove(&color->val, &xft_color, sizeof(xft_color));
   strcpy(color->name, colorname);
-  COLOR_CACHE_ATTACH(color);
+  CC_ATTACH(color);
   return &drw.colorcache->val;
 }
 
@@ -102,10 +116,10 @@ static inline int parse_box_string(const char *val, char color[32])
     color[c++] = val[cursor++];
   if (val[cursor++] == ':')
     while (cursor < nval && val[cursor] >= '0' && val[cursor] <= '9')
-      size = (size * 10) + val[cursor++] - '0';
-  if (cursor < nval - 1)
-    die("Invalid Box template string: %s\n", val);
-  return size > 0 ? size : 1;
+      size = size * 10 + val[cursor++] - '0';
+  if (cursor < nval - 1 && (size = -1) == -1)
+    eprintf("Invalid Box template string: '%s'\n", val);
+  return size + (size <= 0);
 }
 
 static inline void drw_init(const Config *config)
@@ -131,8 +145,10 @@ static inline void bar_init(const BarConfig *barConfig)
   bar.window =
       XCreateSimpleWindow(dpy, root, bar.window_g.x, bar.window_g.y,
                           bar.window_g.w, bar.window_g.h, 0, 0xffffff, 0);
-  XftColorAllocName(dpy, vis, cmap, barConfig->foreground, &bar.foreground);
-  XftColorAllocName(dpy, vis, cmap, barConfig->background, &bar.background);
+  if (!alloc_color(&bar.foreground, barConfig->foreground))
+    alloc_color(&bar.foreground, "#ffffff");
+  if (!alloc_color(&bar.background, barConfig->background))
+    alloc_color(&bar.background, "#000000");
   bar.canvas = XftDrawCreate(dpy, bar.window, vis, cmap);
 }
 
@@ -384,31 +400,30 @@ void clu_toggle(void)
 
 CluEvent clu_nextevent(char value[BLK_BUFFER_SIZE])
 {
+  CluEvent clu_event = CLU_Noop;
   XEvent e;
   if (XPending(dpy)) {
-    XNextEvent(dpy, &e);
-    switch (e.type) {
-    case MapNotify:
+    switch (XNextEvent(dpy, &e), e.type) {
+    case MapNotify: {
       XSelectInput(dpy, root, PropertyChangeMask);
       get_window_name(value);
       return CLU_Ready;
-    case ButtonPress:
+    } break;
+    case ButtonPress: {
       onButtonPress(&e);
-      break;
-    // Reseting the bar on every 'Expose'.
-    // Xft drawable gets cleared, when another window comes on top of it (that
-    // is only if no compositor is running, something like 'picom').
-    case Expose:
+    } break;
+    case Expose: {
       FILL(0, 0, bar.window_g.w, bar.window_g.h);
-      return CLU_Reset;
+      clu_event = CLU_Reset;
+    } break;
     // root window events.
-    case PropertyNotify:
+    case PropertyNotify: {
       if (onPropertyNotify(&e, value))
-        return CLU_NewValue;
-      break;
+        clu_event = CLU_NewValue;
+    } break;
     }
   }
-  return CLU_NoOp;
+  return clu_event;
 }
 
 void clu_cleanup(void)

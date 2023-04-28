@@ -21,7 +21,7 @@ typedef enum {
   CLU_Ready,    // Window's canvas is ready and can now be drawn upon.
   CLU_NewValue, // New Value was just populated in the provided buffer.
   CLU_Reset,    // Reset window canvas.
-  CLU_NoOp,     // NoOP.
+  CLU_Noop,     // No Op.
 } CluEvent;
 typedef enum { Stdin, Custom } BlockType;
 

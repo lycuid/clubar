@@ -1,5 +1,5 @@
 NAME:=clubar
-VERSION:=0.4.7
+VERSION:=0.5.0
 BUILD:=.build
 ODIR:=$(BUILD)/cache
 IDIR:=src
