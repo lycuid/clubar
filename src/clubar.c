@@ -76,15 +76,15 @@ static inline char *readline(LineReader *lr)
 static void *stdin_thread_handler(__attribute__((unused)) void *_)
 {
   THREADSYNC_WAIT(stdin_threadsync);
-  struct pollfd fd  = {.fd = STDIN_FILENO, .events = POLLIN};
+  struct pollfd pfd = {.fd = STDIN_FILENO, .events = POLLIN};
   LineReader reader = LINE_READER();
   char *line;
   for (bool running = core->running; running; ) {
-    if (poll(&fd, 1, 420) > 0) {
-      if (IS_SET(fd.revents, POLLERR | POLLHUP)) {
+    if (poll(&pfd, 1, 420) > 0) {
+      if (IS_SET(pfd.revents, POLLERR | POLLHUP)) {
         WITH_WRLOCK(&core_rwlock) { core->stop_running(); }
       }
-      if (IS_SET(fd.revents, POLLIN)) {
+      if (IS_SET(pfd.revents, POLLIN)) {
         if ((line = readline(&reader)) == NULL) {
           nanosleep(&ts, NULL); // clubar </dev/zero
         } else if (*line) {

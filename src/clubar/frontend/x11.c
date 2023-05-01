@@ -31,11 +31,12 @@ typedef struct ColorCache {
     (void)(c->next ? (c->next->prev = c->prev) : 0);                           \
   } while (0)
 
-#define CC_FREE(c)                                                             \
+#define CC_FREE(cc)                                                            \
   do {                                                                         \
-    CC_DETACH(c);                                                              \
-    XftColorFree(dpy, vis, cmap, &(c)->val);                                   \
-    free(c);                                                                   \
+    __typeof__(cc) tmp = (cc);                                                 \
+    CC_DETACH(tmp);                                                            \
+    XftColorFree(dpy, vis, cmap, &(tmp)->val);                                 \
+    free(tmp);                                                                 \
   } while (0)
 
 static struct Draw {
@@ -52,36 +53,16 @@ static struct Bar {
   XftColor foreground, background;
 } bar;
 
-static XftColor *request_color(const char *);
-static inline int parse_box_string(const char *, char[32]);
-static inline void drw_init(const Config *);
-static inline void bar_init(const BarConfig *);
-static inline void generate_stdin_gis(void);
-static inline void generate_custom_gis(void);
-static inline void xrender_bg(const Block *, const GlyphInfo *);
-static inline void xrender_box(const Block *, const GlyphInfo *);
-static inline void xrender_string(const Block *, const GlyphInfo *);
-static inline void execute_cmd(const char *);
-static inline bool get_window_name(char *);
-static void onButtonPress(const XEvent *);
-static bool onPropertyNotify(const XEvent *, char *);
-
 static Display *dpy;
 static Atom ATOM_WM_NAME;
 
-#define FILL(...)         XftDrawRect(bar.canvas, &bar.background, __VA_ARGS__)
 #define root              (DefaultRootWindow(dpy))
 #define scr               (DefaultScreen(dpy))
 #define vis               (DefaultVisual(dpy, scr))
 #define cmap              (DefaultColormap(dpy, scr))
+#define fill_rect(...)    XftDrawRect(bar.canvas, &bar.background, __VA_ARGS__)
 #define alloc_color(p, c) XftColorAllocName(dpy, vis, cmap, c, p)
-#define free_color(p)                                                          \
-  do {                                                                         \
-    XftColorFree(dpy, vis, cmap, &(p)->val);                                   \
-    free(p);                                                                   \
-  } while (0)
 
-// LRU - linear, which is fine, as the capacity is not that huge.
 static XftColor *request_color(const char *colorname)
 {
   static int capacity = 1 << 5;
@@ -93,14 +74,14 @@ static XftColor *request_color(const char *colorname)
       return &c->val;
     }
   }
+  XftColor xft_color;
+  if (!alloc_color(&xft_color, colorname))
+    return &bar.foreground;
+
   if (capacity)
     capacity--;
   else if (last)
     CC_FREE(last);
-
-  XftColor xft_color;
-  if (!alloc_color(&xft_color, colorname))
-    return &bar.foreground;
   ColorCache *color = (ColorCache *)malloc(sizeof(ColorCache));
   memmove(&color->val, &xft_color, sizeof(xft_color));
   strcpy(color->name, colorname);
@@ -225,7 +206,7 @@ static inline void xrender_box(const Block *blk, const GlyphInfo *gi)
   }
 }
 
-static void xrender_string(const Block *blk, const GlyphInfo *gi)
+static inline void xrender_string(const Block *blk, const GlyphInfo *gi)
 {
   Geometry *canvas_g = &bar.canvas_g;
   int fntindex =
@@ -238,31 +219,27 @@ static void xrender_string(const Block *blk, const GlyphInfo *gi)
                     (FcChar8 *)blk->text, strlen(blk->text));
 }
 
-static inline void execute_cmd(const char *cmd)
+static void execute_cmd(char *const cmd)
 {
   if (fork())
     return;
   if (dpy)
     close(ConnectionNumber(dpy));
   setsid();
-  // splitting space seperated 'cmd' string into an array of 'words'.
-  char *words[50];
-  size_t cursor = 0;
-  for (size_t i = 0, j = 0, k = 0, len = strlen(cmd); i < len;) {
-    for (; i < len && cmd[i] == ' '; ++i) // ignoring spaces.
-      (void)0;
-    for (j = i; i < len && cmd[i] != ' '; ++i) // counting non-space chars.
-      (void)0;
-    if (j < i) {
-      for (words[cursor] = calloc(i - j + 1, sizeof(char)), k = 0; j < i;)
-        words[cursor][k++] = cmd[j++];
-      words[++cursor] = NULL;
-    }
+
+  char *words[1 << 6];
+  uint32_t cursor = 0;
+  for (uint32_t i = 0, len = strlen(cmd); i < len;) {
+    for (; i < len && cmd[i] == ' '; ++i)
+      cmd[i] = 0;
+    if (i < len)
+      words[cursor++] = cmd + i;
+    while (i < len && cmd[i] != ' ')
+      ++i;
   }
-  if (cursor)
-    execvp(words[0], (char **)words);
-  for (size_t i = 0; i < cursor; ++i)
-    free(words[i]);
+  words[cursor] = NULL;
+
+  execvp((char *)words[0], (char **)words);
   exit(EXIT_SUCCESS);
 }
 
@@ -332,30 +309,28 @@ void clu_setup(void)
     drw.gis[Stdin][i] = drw.gis[Custom][i] = (GlyphInfo){0, 0};
   if ((dpy = XOpenDisplay(NULL)) == NULL)
     die("Cannot open display.\n");
-  // initialize drw.
   drw_init(&core->config);
-  // initialize bar.
   bar_init(&core->config.barConfig);
-  // set window properties.
+
   XSetWindowAttributes attrs = {
       .event_mask        = StructureNotifyMask | ExposureMask | ButtonPressMask,
       .override_redirect = True,
   };
   XChangeWindowAttributes(dpy, bar.window, CWEventMask | CWOverrideRedirect,
                           &attrs);
-  // ewmh: set window type
+
   Atom NetWMDock = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", 0);
   XChangeProperty(dpy, bar.window, XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", 0),
                   XA_ATOM, 32, PropModeReplace, (uint8_t *)&NetWMDock,
                   sizeof(Atom));
-  // ewmh: set window struct values.
+
   long barheight = bar.window_g.h + core->config.barConfig.margin.top +
                    core->config.barConfig.margin.bottom;
   long strut[4] = {0, 0, core->config.barConfig.topbar ? barheight : 0,
                    !core->config.barConfig.topbar ? barheight : 0};
   XChangeProperty(dpy, bar.window, XInternAtom(dpy, "_NET_WM_STRUT", 0),
                   XA_CARDINAL, 32, PropModeReplace, (uint8_t *)strut, 4l);
-  // set window resource title, class and instance name.
+
   XStoreName(dpy, bar.window, NAME);
   XSetClassHint(dpy, bar.window,
                 &(XClassHint){.res_name = NAME, .res_class = NAME});
@@ -367,7 +342,7 @@ void clu_clear(BlockType blktype)
   if (core->nblks[blktype]) {
     GlyphInfo *first = &drw.gis[blktype][0],
               *last  = &drw.gis[blktype][core->nblks[blktype] - 1];
-    FILL(first->x, 0, last->x + last->width, bar.window_g.h);
+    fill_rect(first->x, 0, last->x + last->width, bar.window_g.h);
   }
 }
 
@@ -413,7 +388,7 @@ CluEvent clu_nextevent(char value[BLK_BUFFER_SIZE])
       onButtonPress(&e);
     } break;
     case Expose: {
-      FILL(0, 0, bar.window_g.w, bar.window_g.h);
+      fill_rect(0, 0, bar.window_g.w, bar.window_g.h);
       clu_event = CLU_Reset;
     } break;
     // root window events.
@@ -428,11 +403,9 @@ CluEvent clu_nextevent(char value[BLK_BUFFER_SIZE])
 
 void clu_cleanup(void)
 {
-  for (ColorCache *stale; (stale = drw.colorcache);) {
-    drw.colorcache = drw.colorcache->next;
-    XftColorFree(dpy, vis, cmap, &stale->val);
-    free(stale);
-  }
+
+  while (drw.colorcache)
+    CC_FREE(drw.colorcache);
   for (int fnt = 0; fnt < drw.nfonts; ++fnt)
     XftFontClose(dpy, drw.fonts[fnt]);
   XftColorFree(dpy, vis, cmap, &bar.foreground);
