@@ -47,8 +47,8 @@
 #include <clubar/core/tags.h>
 
 typedef struct {
-  char text[BLK_BUFFER_SIZE];
-  Tag *tags[NullTagName];
+    char text[BLK_BUFFER_SIZE];
+    Tag *tags[NullTagName];
 } Block;
 
 int blks_create(Block *, const char *);

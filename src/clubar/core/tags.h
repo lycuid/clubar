@@ -17,9 +17,9 @@ Enum(TagModifier, Shift, Ctrl, Super, Alt, Left, Right, Top, Bottom);
 typedef uint32_t TagModifierMask;
 
 typedef struct Tag {
-  TagModifierMask tmod_mask;
-  char val[BLK_BUFFER_SIZE];
-  struct Tag *previous;
+    TagModifierMask tmod_mask;
+    char val[BLK_BUFFER_SIZE];
+    struct Tag *previous;
 } Tag;
 
 static const TagModifier ValidTagModifiers[NullTagName][NullTagModifier] = {

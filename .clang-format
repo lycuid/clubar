@@ -2,4 +2,5 @@
 AlignConsecutiveAssignments: true
 AlignConsecutiveMacros: true
 BreakBeforeBraces: Linux
+IndentWidth: 4
 ---

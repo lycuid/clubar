@@ -12,47 +12,48 @@
 
 #define eprintf(...) fprintf(stderr, __VA_ARGS__);
 #define die(...)                                                               \
-  {                                                                            \
-    eprintf("[ERROR] " __VA_ARGS__);                                           \
-    exit(1);                                                                   \
-  }
+    {                                                                          \
+        eprintf("[ERROR] " __VA_ARGS__);                                       \
+        exit(1);                                                               \
+    }
 
 typedef enum {
-  CLU_Ready,    // Window's canvas is ready and can now be drawn upon.
-  CLU_NewValue, // New Value was just populated in the provided buffer.
-  CLU_Reset,    // Reset window canvas.
-  CLU_Noop,     // No Op.
+    CLU_Ready,    // Window's canvas is ready and can now be drawn upon.
+    CLU_NewValue, // New Value was just populated in the provided buffer.
+    CLU_Reset,    // Reset window canvas.
+    CLU_Noop,     // No Op.
 } CluEvent;
 typedef enum { Stdin, Custom } BlockType;
 
 typedef struct {
-  uint32_t x, y, w, h;
+    uint32_t x, y, w, h;
 } Geometry;
 
 typedef struct {
-  int topbar : 1;
-  Geometry geometry;
-  struct {
-    uint32_t left, right, top, bottom;
-  } padding, margin;
-  char foreground[16], background[16];
+    int topbar : 1;
+    Geometry geometry;
+    struct {
+        uint32_t left, right, top, bottom;
+    } padding, margin;
+    char foreground[16], background[16];
 } BarConfig;
 
 typedef struct {
-  int nfonts;
-  char **fonts;
-  BarConfig barConfig;
+    int nfonts;
+    char **fonts;
+    BarConfig barConfig;
 } Config;
 
 extern const struct Core {
-  bool running;
-  Block *blks[2];
-  int nblks[2];
-  Config config;
-  void (*init)(int argc, char *const *argv);
-  void (*update_blks)(BlockType, const char *);
-  void (*stop_running)(void);
-} *core;
+    bool running;
+    Block *blks[2];
+    int nblks[2];
+    Config config;
+
+    void (*init)(int argc, char *const *argv);
+    void (*update_blks)(BlockType, const char *);
+    void (*stop_running)(void);
+} *const core;
 
 /* These functions are supposed to be implemented by whichever 'frontend' that
  * is being used. */
