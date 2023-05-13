@@ -50,22 +50,70 @@ A minimalistic, flexible statusbar program (mainly as a utility for window manag
 .SH
 OPTIONS
 .PP
-\fB\-h, \-\-help\fR
+\fV\-h, \-\-help\fR
 .RS
-Print usage and exit.
+print this help message.
 .RE
 
 .PP
-\fB\-v, \-\-version\fR
+\fV\-v, \-\-version\fR
 .RS
-Print version and exit.
+print version.
 .RE
 
 .PP
-\fB\-c \fIfile\fR,
-\fB\-\-config\fR[=\fIfile\fR]
+\fV\-t, \-\-topbar\fR
 .RS
-file path for runtime configs (supports: lua).
+window position (top/bottom edge of the screen).
+.RE
+
+.PP
+\fV\-c \fIfile\fR,
+\fV\-\-config\fR[=\fIfile\fR]
+.RS
+filepath for runtime configs (supports: lua).
+.RE
+
+.PP
+\fV\-g \fIvalues\fR,
+\fV\-\-geometry\fR[=\fIvalues\fR]
+.RS
+window geometry as 'x,y,width,height' (eg: '0,0,1280,720').
+.RE
+
+.PP
+\fV\-p \fIvalues\fR,
+\fV\-\-padding\fR[=\fIvalues\fR]
+.RS
+window padding as 'left,right,top,bot' (eg: '0,0,10,10').
+.RE
+
+.PP
+\fV\-m \fIvalues\fR,
+\fV\-\-margin\fR[=\fIvalues\fR]
+.RS
+window margin as 'left,right,top,bot' (eg: '0,0,10,10').
+.RE
+
+.PP
+\fV\-f \fIcolor\fR,
+\fV\-\-foreground\fR[=\fIcolor\fR]
+.RS
+set default foreground color.
+.RE
+
+.PP
+\fV\-b \fIcolor\fR,
+\fV\-\-background\fR[=\fIcolor\fR]
+.RS
+set default background color.
+.RE
+
+.PP
+\fV\-\-fonts\fR[=\fIvalues\fR]
+.RS
+comma seperated fonts (eg: 'arial-10,monospace-10:bold').
+.RE
 
 .SH
 SIGNALS

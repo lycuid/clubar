@@ -43,10 +43,23 @@ Usage
 ```txt
 USAGE: clubar [OPTIONS]...
 OPTIONS:
-  -h    print this help message.
-  -v    print version.
-  -c <config_file>
-        filepath for runtime configs (supports: lua).
+  -h, --help      print this help message.
+  -v, --version   print version.
+  -t, --topbar    window position (top/bottom edge of the screen).
+  -c file, --config[=file]
+                  filepath for runtime configs (supports: lua).
+  -g values, --geometry[=values]
+                  window geometry as 'x,y,width,height' (eg: '0,0,1280,720').
+  -p values, --padding[=values]
+                  window padding as 'left,right,top,bot' (eg: '0,0,10,10').
+  -m values, --margin[=values]
+                  window margin as 'left,right,top,bot' (eg: '0,0,10,10').
+  -f color, --foreground[=color]
+                  set default foreground color.
+  -b color, --background[=color]
+                  set default background color.
+  --fonts[=values]
+                  comma seperated fonts (eg: 'arial-10,monospace-10:bold').
 SIGNALS:
   USR1: toggle window visibility (e.g. pkill -USR1 clubar).
 ```

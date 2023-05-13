@@ -30,18 +30,16 @@ typedef struct {
 } Geometry;
 
 typedef struct {
-    int topbar : 1;
-    Geometry geometry;
-    struct {
-        uint32_t left, right, top, bottom;
-    } padding, margin;
-    char foreground[16], background[16];
-} BarConfig;
+    uint32_t left, right, top, bottom;
+} Direction;
 
 typedef struct {
     int nfonts;
     char **fonts;
-    BarConfig barConfig;
+    int topbar;
+    Geometry geometry;
+    Direction padding, margin;
+    char foreground[16], background[16];
 } Config;
 
 extern const struct Core {
@@ -54,6 +52,8 @@ extern const struct Core {
     void (*update_blks)(BlockType, const char *);
     void (*stop_running)(void);
 } *const core;
+
+void load_fonts_from_string(char *);
 
 /* These functions are supposed to be implemented by whichever 'frontend' that
  * is being used. */

@@ -12,19 +12,19 @@
     {                                                                          \
         lua_getfield(L, (index), field);                                       \
         if (!lua_isnil(L, -1))                                                 \
-            *result = lua_f(L, -1);                                            \
+            *(result) = lua_f(L, -1);                                          \
         lua_pop(L, 1);                                                         \
     }
 
 static inline int GetTableAsIntArray(lua_State *L, int index, const char *table,
-                                     const char **repr, int *result, int size)
+                                     const char **repr, int *ret, int size)
 {
-    memset(result, 0, size * sizeof(int));
-    lua_getfield(L, (index), table);
+    memset(ret, 0, size);
+    lua_getfield(L, index, table);
     int found = !lua_isnil(L, index + 1);
     if (found)
         for (int i = 0; i < size; ++i)
-            GetField(L, index + 1, repr[i], &result[i], lua_tointeger);
+            GetField(L, index + 1, repr[i], &ret[i], lua_tointeger);
     lua_pop(L, 1);
     return found;
 }
@@ -37,61 +37,29 @@ static inline void GetString(lua_State *L, int index, const char *f, char *res)
     lua_pop(L, 1);
 }
 
-static inline void load_bar_config(lua_State *L, BarConfig *barConfig)
+static inline void load_fonts(lua_State *L, Config *c)
 {
-    lua_getfield(L, 1, "barConfig");
-    int barindex = 2;
-    if (lua_isnil(L, barindex))
-        return;
-
-    GetString(L, barindex, "foreground", (char *)barConfig->foreground);
-    GetString(L, barindex, "background", (char *)barConfig->background);
-
-    int topbar = 0;
-    GetField(L, barindex, "topbar", &topbar, lua_toboolean);
-    barConfig->topbar = topbar;
-
-#define size 4
-    int ints[size];
-    const char *g_members[4] = {"x", "y", "w", "h"};
-    const char *members[4]   = {"left", "right", "top", "bottom"};
-
-    // @TODO: Make sure there are no struct padding bugs during all the memcpy
-    // int_array -> struct. currently, don't know how struct padding works...but
-    // this code works, gl.
-    if (GetTableAsIntArray(L, barindex, "geometry", g_members, ints, size))
-        memcpy(&barConfig->geometry, ints, size * sizeof(int));
-
-    if (GetTableAsIntArray(L, barindex, "padding", members, ints, size))
-        memcpy(&barConfig->padding, ints, size * sizeof(int));
-
-    if (GetTableAsIntArray(L, barindex, "margin", members, ints, size))
-        memcpy(&barConfig->margin, ints, size * sizeof(int));
-#undef size
-}
-
-static inline void load_font_config(lua_State *L, Config *luaConfig)
-{
-    luaConfig->nfonts = 0;
+    c->nfonts = 0;
     lua_getfield(L, 1, "fonts");
-
     if (lua_isnil(L, 2))
         return;
 
     lua_pushnil(L);
-    luaConfig->fonts = NULL;
+    for (int i = 0; i < c->nfonts; ++i)
+        free(c->fonts[i]);
+    free(c->fonts);
+    c->fonts = NULL, c->nfonts = 0;
     while (lua_next(L, -2)) {
         lua_pushvalue(L, -2);
-        luaConfig->fonts =
-            realloc(luaConfig->fonts, (luaConfig->nfonts + 1) * sizeof(char *));
-        luaConfig->fonts[luaConfig->nfonts++] = (char *)lua_tostring(L, -2);
+        c->fonts = realloc(c->fonts, (c->nfonts + 1) * sizeof(char *));
+        c->fonts[c->nfonts++] = (char *)lua_tostring(L, -2);
         lua_pop(L, 2);
     }
 }
 
-void luaconfig_merge(const char *luafile, Config *luaConfig)
+void luaconfig_merge(const char *luafile, Config *config)
 {
-    if (!luafile)
+    if (!luafile || !strlen(luafile))
         return;
     lua_State *L = luaL_newstate();
     luaL_openlibs(L);
@@ -101,6 +69,23 @@ void luaconfig_merge(const char *luafile, Config *luaConfig)
     lua_getglobal(L, "Config");
     if (lua_isnil(L, 1))
         die("Invalid 'Config' table.\n");
-    load_bar_config(L, &luaConfig->barConfig);
-    load_font_config(L, luaConfig);
+
+    int ret[4];
+    const char *g_members[] = {"x", "y", "w", "h"};
+    const char *members[]   = {"left", "right", "top", "bottom"};
+
+    if (GetTableAsIntArray(L, 1, "geometry", g_members, ret, 4))
+        memcpy(&config->geometry, ret, sizeof(ret));
+
+    if (GetTableAsIntArray(L, 1, "padding", members, ret, 4))
+        memcpy(&config->padding, ret, sizeof(ret));
+
+    if (GetTableAsIntArray(L, 1, "margin", members, ret, 4))
+        memcpy(&config->margin, ret, sizeof(ret));
+
+    GetField(L, 1, "topbar", &config->topbar, lua_toboolean);
+    GetString(L, 1, "foreground", (char *)config->foreground);
+    GetString(L, 1, "background", (char *)config->background);
+
+    load_fonts(L, config);
 }

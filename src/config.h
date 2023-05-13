@@ -8,14 +8,12 @@
  */
 #include <clubar/core.h>
 
-static const BarConfig barConfig = {
-    .geometry   = {0, 768 - 32, 1366, 32},
-    .padding    = {0, 0, 0, 0},
-    .margin     = {0, 0, 0, 0},
-    .topbar     = 0,
-    .foreground = "#efefef",
-    .background = "#090909",
-};
+static const Geometry geometry = {.x = 0, .y = 768 - 32, .w = 1366, .h = 32};
+static const Direction padding = {.left = 0, .right = 0, .top = 0, .bottom = 0};
+static const Direction margin  = {.left = 0, .right = 0, .top = 0, .bottom = 0};
+static const int topbar        = 0;
+static const char foreground[] = "#efefef";
+static const char background[] = "#090909";
 
 // This cannot be empty, first font is the default;
 static const char *const fonts[] = {"monospace-9", "monospace-9:bold"};

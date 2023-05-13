@@ -113,23 +113,23 @@ static inline void drw_init(const Config *config)
     drw.colorcache = NULL;
 }
 
-static inline void bar_init(const BarConfig *barConfig)
+static inline void bar_init(const Config *config)
 {
-    Geometry geometry = barConfig->geometry;
+    Geometry geometry = config->geometry;
     ATOM_WM_NAME      = XInternAtom(dpy, "WM_NAME", False);
     bar.window_g   = (Geometry){geometry.x, geometry.y, geometry.w, geometry.h};
-    bar.canvas_g.x = barConfig->padding.left;
-    bar.canvas_g.y = barConfig->padding.top;
+    bar.canvas_g.x = config->padding.left;
+    bar.canvas_g.y = config->padding.top;
     bar.canvas_g.w =
-        bar.window_g.w - barConfig->padding.left - barConfig->padding.right;
+        bar.window_g.w - config->padding.left - config->padding.right;
     bar.canvas_g.h =
-        bar.window_g.h - barConfig->padding.top - barConfig->padding.bottom;
+        bar.window_g.h - config->padding.top - config->padding.bottom;
     bar.window =
         XCreateSimpleWindow(dpy, root, bar.window_g.x, bar.window_g.y,
                             bar.window_g.w, bar.window_g.h, 0, 0xffffff, 0);
-    if (!alloc_color(&bar.foreground, barConfig->foreground))
+    if (!alloc_color(&bar.foreground, config->foreground))
         alloc_color(&bar.foreground, "#ffffff");
-    if (!alloc_color(&bar.background, barConfig->background))
+    if (!alloc_color(&bar.background, config->background))
         alloc_color(&bar.background, "#000000");
     bar.canvas = XftDrawCreate(dpy, bar.window, vis, cmap);
 }
@@ -311,7 +311,7 @@ void clu_setup(void)
     if ((dpy = XOpenDisplay(NULL)) == NULL)
         die("Cannot open display.\n");
     drw_init(&core->config);
-    bar_init(&core->config.barConfig);
+    bar_init(&core->config);
 
     XSetWindowAttributes attrs = {
         .event_mask = StructureNotifyMask | ExposureMask | ButtonPressMask,
@@ -325,10 +325,10 @@ void clu_setup(void)
                     XA_ATOM, 32, PropModeReplace, (uint8_t *)&NetWMDock,
                     sizeof(Atom));
 
-    long barheight = bar.window_g.h + core->config.barConfig.margin.top +
-                     core->config.barConfig.margin.bottom;
-    long strut[4] = {0, 0, core->config.barConfig.topbar ? barheight : 0,
-                     !core->config.barConfig.topbar ? barheight : 0};
+    long barheight =
+        bar.window_g.h + core->config.margin.top + core->config.margin.bottom;
+    long strut[4] = {0, 0, core->config.topbar ? barheight : 0,
+                     !core->config.topbar ? barheight : 0};
     XChangeProperty(dpy, bar.window, XInternAtom(dpy, "_NET_WM_STRUT", 0),
                     XA_CARDINAL, 32, PropModeReplace, (uint8_t *)strut, 4l);
 

@@ -175,5 +175,6 @@ int main(int argc, char **argv)
     pthread_join(stdin_thread, NULL);
     pthread_join(sig_thread, NULL);
     clu_cleanup();
+
     return 0;
 }
