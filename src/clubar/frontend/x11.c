@@ -20,15 +20,15 @@ typedef struct ColorCache {
 } ColorCache;
 
 #define CC_ATTACH(c)                                                           \
-    do { /* Attach item on top of the 'drw.colorcache' linked list.*/          \
-        if ((c->prev = NULL, c->next = drw.colorcache))                        \
-            drw.colorcache->prev = c;                                          \
-        drw.colorcache = c;                                                    \
+    do { /* Attach item on top of the 'drw_ctx.colorcache' linked list.*/      \
+        if ((c->prev = NULL, c->next = drw_ctx.colorcache))                    \
+            drw_ctx.colorcache->prev = c;                                      \
+        drw_ctx.colorcache = c;                                                \
     } while (0)
 #define CC_DETACH(c)                                                           \
-    do { /* Detach item from the 'drw.colorcache' linked list.*/               \
+    do { /* Detach item from the 'drw_ctx.colorcache' linked list.*/           \
         (void)(c->prev ? (c->prev->next = c->next)                             \
-                       : (drw.colorcache = c->next));                          \
+                       : (drw_ctx.colorcache = c->next));                      \
         (void)(c->next ? (c->next->prev = c->prev) : 0);                       \
     } while (0)
 
@@ -36,39 +36,42 @@ typedef struct ColorCache {
     do {                                                                       \
         __typeof__(cc) tmp = (cc);                                             \
         CC_DETACH(tmp);                                                        \
-        XftColorFree(dpy, vis, cmap, &(tmp)->val);                             \
+        XftColorFree(dpy(), vis(), cmap(), &(tmp)->val);                       \
         free(tmp);                                                             \
     } while (0)
 
-static struct Draw {
+static struct DrawContext {
     int nfonts;
     XftFont **fonts;
     GlyphInfo gis[2][MAX_BLKS];
     ColorCache *colorcache;
-} drw;
+} drw_ctx = {0};
 
 static struct Bar {
     Window window;
     XftDraw *canvas;
     Geometry window_g, canvas_g;
     XftColor foreground, background;
-} bar;
+} bar = {0};
 
-static Display *dpy;
-static Atom ATOM_WM_NAME;
+static Display *_dpy;
+#define dpy() _dpy
 
-#define root              (DefaultRootWindow(dpy))
-#define scr               (DefaultScreen(dpy))
-#define vis               (DefaultVisual(dpy, scr))
-#define cmap              (DefaultColormap(dpy, scr))
+#define root()            (DefaultRootWindow(dpy()))
+#define scr()             (DefaultScreen(dpy()))
+#define vis()             (DefaultVisual(dpy(), scr()))
+#define cmap()            (DefaultColormap(dpy(), scr()))
 #define fill_rect(...)    XftDrawRect(bar.canvas, &bar.background, __VA_ARGS__)
-#define alloc_color(p, c) XftColorAllocName(dpy, vis, cmap, c, p)
+#define alloc_color(p, c) XftColorAllocName(dpy(), vis(), cmap(), c, p)
+
+enum { WMName, NetWMWindowType, NetWMDock, NetWMStrut, NullWMAtom };
+static Atom atoms[NullWMAtom];
 
 static XftColor *request_color(const char *colorname)
 {
     static int capacity = 1 << 5;
     ColorCache *last    = NULL;
-    for (ColorCache *c = drw.colorcache; c; last = c, c = c->next) {
+    for (ColorCache *c = drw_ctx.colorcache; c; last = c, c = c->next) {
         if (strcmp(c->name, colorname) == 0) {
             CC_DETACH(c);
             CC_ATTACH(c);
@@ -87,7 +90,7 @@ static XftColor *request_color(const char *colorname)
     memmove(&color->val, &xft_color, sizeof(xft_color));
     strcpy(color->name, colorname);
     CC_ATTACH(color);
-    return &drw.colorcache->val;
+    return &drw_ctx.colorcache->val;
 }
 
 static inline int parse_box_string(const char *val, char color[32])
@@ -104,34 +107,72 @@ static inline int parse_box_string(const char *val, char color[32])
     return size + (size <= 0);
 }
 
-static inline void drw_init(const Config *config)
+static inline void drw_ctx_init(const Config *config)
 {
-    drw.nfonts = config->nfonts;
-    drw.fonts  = (XftFont **)malloc(drw.nfonts * sizeof(XftFont *));
-    for (int i = 0; i < drw.nfonts; ++i)
-        drw.fonts[i] = XftFontOpenName(dpy, scr, config->fonts[i]);
-    drw.colorcache = NULL;
+    // As this function can be called multiple times, we need to deallocate the
+    // previously allocated stuff.
+    for (int i = 0; i < drw_ctx.nfonts; ++i)
+        XftFontClose(dpy(), drw_ctx.fonts[i]);
+
+    drw_ctx.nfonts = config->nfonts;
+    drw_ctx.fonts =
+        (XftFont **)realloc(drw_ctx.fonts, drw_ctx.nfonts * sizeof(XftFont *));
+    for (int i = 0; i < drw_ctx.nfonts; ++i)
+        drw_ctx.fonts[i] = XftFontOpenName(dpy(), scr(), config->fonts[i]);
+
+    while (drw_ctx.colorcache)
+        CC_FREE(drw_ctx.colorcache);
+    drw_ctx.colorcache = NULL;
 }
 
 static inline void bar_init(const Config *config)
 {
     Geometry geometry = config->geometry;
-    ATOM_WM_NAME      = XInternAtom(dpy, "WM_NAME", False);
-    bar.window_g   = (Geometry){geometry.x, geometry.y, geometry.w, geometry.h};
-    bar.canvas_g.x = config->padding.left;
-    bar.canvas_g.y = config->padding.top;
-    bar.canvas_g.w =
-        bar.window_g.w - config->padding.left - config->padding.right;
-    bar.canvas_g.h =
-        bar.window_g.h - config->padding.top - config->padding.bottom;
-    bar.window =
-        XCreateSimpleWindow(dpy, root, bar.window_g.x, bar.window_g.y,
-                            bar.window_g.w, bar.window_g.h, 0, 0xffffff, 0);
-    if (!alloc_color(&bar.foreground, config->foreground))
-        alloc_color(&bar.foreground, "#ffffff");
-    if (!alloc_color(&bar.background, config->background))
-        alloc_color(&bar.background, "#000000");
-    bar.canvas = XftDrawCreate(dpy, bar.window, vis, cmap);
+
+    if (!bar.window)
+        bar.window = XCreateSimpleWindow(dpy(), root(), 0, 0, 10, 10, 0, 0, 0);
+    if (!bar.canvas)
+        bar.canvas = XftDrawCreate(dpy(), bar.window, vis(), cmap());
+
+    /* window geometry and placement. */ {
+        bar.window_g   = geometry;
+        bar.canvas_g.x = config->padding.left;
+        bar.canvas_g.y = config->padding.top;
+        bar.canvas_g.w =
+            bar.window_g.w - config->padding.left - config->padding.right;
+        bar.canvas_g.h =
+            bar.window_g.h - config->padding.top - config->padding.bottom;
+        XMoveResizeWindow(dpy(), bar.window, bar.window_g.x, bar.window_g.y,
+                          bar.window_g.w, bar.window_g.h);
+    }
+
+    /* allocating foreground and background colors for the window. */ {
+        // @TODO: free these colors on reload config.
+        if (!alloc_color(&bar.foreground, config->foreground))
+            alloc_color(&bar.foreground, "#ffffff");
+        if (!alloc_color(&bar.background, config->background))
+            alloc_color(&bar.background, "#000000");
+    }
+
+    /* update window properties. */ {
+        XSetWindowAttributes attrs = {
+            .event_mask = StructureNotifyMask | ExposureMask | ButtonPressMask,
+            .override_redirect = True,
+        };
+        XChangeWindowAttributes(dpy(), bar.window,
+                                CWEventMask | CWOverrideRedirect, &attrs);
+
+        XChangeProperty(dpy(), bar.window, atoms[NetWMWindowType], XA_ATOM, 32,
+                        PropModeReplace, (uint8_t *)&atoms[NetWMDock],
+                        sizeof(Atom));
+
+        long barheight = bar.window_g.h + core->config.margin.top +
+                         core->config.margin.bottom;
+        long strut[4] = {0, 0, core->config.topbar ? barheight : 0,
+                         !core->config.topbar ? barheight : 0};
+        XChangeProperty(dpy(), bar.window, atoms[NetWMStrut], XA_CARDINAL, 32,
+                        PropModeReplace, (uint8_t *)strut, 4l);
+    }
 }
 
 static inline void generate_stdin_gis(void)
@@ -140,12 +181,13 @@ static inline void generate_stdin_gis(void)
     int fntindex, startx = 0;
     for (int i = 0; i < core->nblks[Stdin]; ++i) {
         const Block *blk = &core->blks[Stdin][i];
-        fntindex = blk->tags[Fn] ? atoi(blk->tags[Fn]->val) % drw.nfonts : 0;
-        XftTextExtentsUtf8(dpy, drw.fonts[fntindex], (FcChar8 *)blk->text,
+        fntindex =
+            blk->tags[Fn] ? atoi(blk->tags[Fn]->val) % drw_ctx.nfonts : 0;
+        XftTextExtentsUtf8(dpy(), drw_ctx.fonts[fntindex], (FcChar8 *)blk->text,
                            strlen(blk->text), &extent);
-        drw.gis[Stdin][i].width = extent.xOff;
-        drw.gis[Stdin][i].x     = startx + extent.x;
-        startx += drw.gis[Stdin][i].width;
+        drw_ctx.gis[Stdin][i].width = extent.xOff;
+        drw_ctx.gis[Stdin][i].x     = startx + extent.x;
+        startx += drw_ctx.gis[Stdin][i].width;
     }
 }
 
@@ -155,21 +197,20 @@ static inline void generate_custom_gis(void)
     int fntindex, startx = bar.canvas_g.x + bar.canvas_g.w;
     for (int i = core->nblks[Custom] - 1; i >= 0; --i) {
         const Block *blk = &core->blks[Custom][i];
-        fntindex = blk->tags[Fn] ? atoi(blk->tags[Fn]->val) % drw.nfonts : 0;
-        XftTextExtentsUtf8(dpy, drw.fonts[fntindex], (FcChar8 *)blk->text,
+        fntindex =
+            blk->tags[Fn] ? atoi(blk->tags[Fn]->val) % drw_ctx.nfonts : 0;
+        XftTextExtentsUtf8(dpy(), drw_ctx.fonts[fntindex], (FcChar8 *)blk->text,
                            strlen(blk->text), &extent);
-        drw.gis[Custom][i].width = extent.xOff;
+        drw_ctx.gis[Custom][i].width = extent.xOff;
         startx -= extent.x + extent.xOff;
-        drw.gis[Custom][i].x = startx;
+        drw_ctx.gis[Custom][i].x = startx;
     }
 }
 
 static inline void xrender_bg(const Block *blk, const GlyphInfo *gi)
 {
-    const Geometry *canvas_g = &bar.canvas_g;
-    if (blk->tags[Bg] != NULL)
-        XftDrawRect(bar.canvas, request_color(blk->tags[Bg]->val), gi->x,
-                    canvas_g->y, gi->width, canvas_g->h);
+    XftDrawRect(bar.canvas, request_color(blk->tags[Bg]->val), gi->x,
+                bar.canvas_g.y, gi->width, bar.canvas_g.h);
 }
 
 static inline void xrender_box(const Block *blk, const GlyphInfo *gi)
@@ -198,8 +239,7 @@ static inline void xrender_box(const Block *blk, const GlyphInfo *gi)
                     bx = gi->x, by = canvas_g->y + canvas_g->h - size,
                     bw = gi->width, bh = size;
                 } break;
-                default:
-                    break;
+                default: break;
                 }
                 XftDrawRect(bar.canvas, request_color(color), bx, by, bw, bh);
             }
@@ -211,12 +251,13 @@ static inline void xrender_string(const Block *blk, const GlyphInfo *gi)
 {
     Geometry *canvas_g = &bar.canvas_g;
     int fntindex =
-        blk->tags[Fn] != NULL ? atoi(blk->tags[Fn]->val) % drw.nfonts : 0;
-    int starty = canvas_g->y + (canvas_g->h - drw.fonts[fntindex]->height) / 2 +
-                 drw.fonts[fntindex]->ascent;
+        blk->tags[Fn] != NULL ? atoi(blk->tags[Fn]->val) % drw_ctx.nfonts : 0;
+    int starty = canvas_g->y +
+                 (canvas_g->h - drw_ctx.fonts[fntindex]->height) / 2 +
+                 drw_ctx.fonts[fntindex]->ascent;
     XftColor *fg = blk->tags[Fg] != NULL ? request_color(blk->tags[Fg]->val)
                                          : &bar.foreground;
-    XftDrawStringUtf8(bar.canvas, fg, drw.fonts[fntindex], gi->x, starty,
+    XftDrawStringUtf8(bar.canvas, fg, drw_ctx.fonts[fntindex], gi->x, starty,
                       (FcChar8 *)blk->text, strlen(blk->text));
 }
 
@@ -224,8 +265,8 @@ static void execute_cmd(char *const cmd)
 {
     if (fork())
         return;
-    if (dpy)
-        close(ConnectionNumber(dpy));
+    if (dpy())
+        close(ConnectionNumber(dpy()));
     setsid();
 
     char *words[1 << 6];
@@ -244,10 +285,10 @@ static void execute_cmd(char *const cmd)
     exit(EXIT_SUCCESS);
 }
 
-static inline bool get_window_name(char *buffer)
+static inline bool get_window_name(char *const buffer)
 {
     char *wm_name;
-    if (XFetchName(dpy, root, &wm_name) && wm_name) {
+    if (XFetchName(dpy(), root(), &wm_name) && wm_name) {
         strcpy(buffer, wm_name);
         XFree(wm_name);
         return true;
@@ -261,21 +302,25 @@ static void onButtonPress(const XEvent *xevent)
     TagName tag_name          = NullTagName;
     TagModifierMask tmod_mask = 0x0;
     for (int i = 0; i < core->nblks[Stdin] + core->nblks[Custom]; ++i) {
-        const Block *blk    = i < core->nblks[Stdin]
-                                  ? &core->blks[Stdin][i]
-                                  : &core->blks[Custom][i - core->nblks[Stdin]];
-        const GlyphInfo *gi = i < core->nblks[Stdin]
-                                  ? &drw.gis[Stdin][i]
-                                  : &drw.gis[Custom][i - core->nblks[Stdin]];
+        const Block *blk = i < core->nblks[Stdin]
+                               ? &core->blks[Stdin][i]
+                               : &core->blks[Custom][i - core->nblks[Stdin]];
+        const GlyphInfo *gi =
+            i < core->nblks[Stdin]
+                ? &drw_ctx.gis[Stdin][i]
+                : &drw_ctx.gis[Custom][i - core->nblks[Stdin]];
         // check if click event coordinates match with any coordinate on the bar
         // window.
         if (e->x >= gi->x && e->x <= gi->x + gi->width) {
-            tag_name = e->button == Button1   ? BtnL
-                       : e->button == Button2 ? BtnM
-                       : e->button == Button3 ? BtnR
-                       : e->button == Button4 ? ScrlU
-                       : e->button == Button5 ? ScrlD
-                                              : NullTagName;
+
+            switch (e->button) {
+            case Button1: tag_name = BtnL; break;
+            case Button2: tag_name = BtnM; break;
+            case Button3: tag_name = BtnR; break;
+            case Button4: tag_name = ScrlU; break;
+            case Button5: tag_name = ScrlD; break;
+            default: tag_name = NullTagName; break;
+            }
 
             tmod_mask = 0x0;
             if (e->state & ShiftMask)
@@ -299,50 +344,36 @@ static void onButtonPress(const XEvent *xevent)
 static bool onPropertyNotify(const XEvent *xevent, char *name)
 {
     const XPropertyEvent *e = &xevent->xproperty;
-    if (e->window == root && e->atom == ATOM_WM_NAME)
+    if (e->window == root() && e->atom == atoms[WMName])
         return get_window_name(name);
     return false;
 }
 
-void clu_setup(void)
+void clu_init(void)
 {
     for (int i = 0; i < MAX_BLKS; ++i)
-        drw.gis[Stdin][i] = drw.gis[Custom][i] = (GlyphInfo){0, 0};
-    if ((dpy = XOpenDisplay(NULL)) == NULL)
+        drw_ctx.gis[Stdin][i] = drw_ctx.gis[Custom][i] = (GlyphInfo){0, 0};
+    if ((dpy() = XOpenDisplay(NULL)) == NULL)
         die("Cannot open display.\n");
-    drw_init(&core->config);
-    bar_init(&core->config);
 
-    XSetWindowAttributes attrs = {
-        .event_mask = StructureNotifyMask | ExposureMask | ButtonPressMask,
-        .override_redirect = True,
-    };
-    XChangeWindowAttributes(dpy, bar.window, CWEventMask | CWOverrideRedirect,
-                            &attrs);
+    atoms[WMName]          = XInternAtom(dpy(), "WM_NAME", False);
+    atoms[NetWMWindowType] = XInternAtom(dpy(), "_NET_WM_WINDOW_TYPE", 0);
+    atoms[NetWMDock]       = XInternAtom(dpy(), "_NET_WM_WINDOW_TYPE_DOCK", 0);
+    atoms[NetWMStrut]      = XInternAtom(dpy(), "_NET_WM_STRUT", 0);
 
-    Atom NetWMDock = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", 0);
-    XChangeProperty(dpy, bar.window, XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", 0),
-                    XA_ATOM, 32, PropModeReplace, (uint8_t *)&NetWMDock,
-                    sizeof(Atom));
+    clu_load_gui();
 
-    long barheight =
-        bar.window_g.h + core->config.margin.top + core->config.margin.bottom;
-    long strut[4] = {0, 0, core->config.topbar ? barheight : 0,
-                     !core->config.topbar ? barheight : 0};
-    XChangeProperty(dpy, bar.window, XInternAtom(dpy, "_NET_WM_STRUT", 0),
-                    XA_CARDINAL, 32, PropModeReplace, (uint8_t *)strut, 4l);
-
-    XStoreName(dpy, bar.window, NAME);
-    XSetClassHint(dpy, bar.window,
+    XStoreName(dpy(), bar.window, NAME);
+    XSetClassHint(dpy(), bar.window,
                   &(XClassHint){.res_name = NAME, .res_class = NAME});
-    XMapWindow(dpy, bar.window);
+    XMapWindow(dpy(), bar.window);
 }
 
 void clu_clear(BlockType blktype)
 {
     if (core->nblks[blktype]) {
-        GlyphInfo *first = &drw.gis[blktype][0],
-                  *last  = &drw.gis[blktype][core->nblks[blktype] - 1];
+        GlyphInfo *first = &drw_ctx.gis[blktype][0],
+                  *last  = &drw_ctx.gis[blktype][core->nblks[blktype] - 1];
         fill_rect(first->x, 0, last->x + last->width, bar.window_g.h);
     }
 }
@@ -359,9 +390,12 @@ void clu_render(BlockType blktype)
     }
     for (int i = 0; i < core->nblks[blktype]; ++i) {
         const Block *blk    = &core->blks[blktype][i];
-        const GlyphInfo *gi = &drw.gis[blktype][i];
-        xrender_bg(blk, gi);
-        xrender_box(blk, gi);
+        const GlyphInfo *gi = &drw_ctx.gis[blktype][i];
+
+        if (blk->tags[Bg] != NULL)
+            xrender_bg(blk, gi);
+        if (blk->tags[Box] != NULL)
+            xrender_box(blk, gi);
         xrender_string(blk, gi);
     }
 }
@@ -369,19 +403,19 @@ void clu_render(BlockType blktype)
 void clu_toggle(void)
 {
     XWindowAttributes attrs;
-    XGetWindowAttributes(dpy, bar.window, &attrs);
-    attrs.map_state == IsUnmapped ? XMapWindow(dpy, bar.window)
-                                  : XUnmapWindow(dpy, bar.window);
+    XGetWindowAttributes(dpy(), bar.window, &attrs);
+    attrs.map_state == IsUnmapped ? XMapWindow(dpy(), bar.window)
+                                  : XUnmapWindow(dpy(), bar.window);
 }
 
 CluEvent clu_nextevent(char value[BLK_BUFFER_SIZE])
 {
     CluEvent clu_event = CLU_Noop;
     XEvent e;
-    if (XPending(dpy)) {
-        switch (XNextEvent(dpy, &e), e.type) {
+    if (XPending(dpy())) {
+        switch (XNextEvent(dpy(), &e), e.type) {
         case MapNotify: {
-            XSelectInput(dpy, root, PropertyChangeMask);
+            XSelectInput(dpy(), root(), PropertyChangeMask);
             get_window_name(value);
             clu_event = CLU_Ready;
         } break;
@@ -404,13 +438,19 @@ CluEvent clu_nextevent(char value[BLK_BUFFER_SIZE])
 
 void clu_cleanup(void)
 {
-
-    while (drw.colorcache)
-        CC_FREE(drw.colorcache);
-    for (int fnt = 0; fnt < drw.nfonts; ++fnt)
-        XftFontClose(dpy, drw.fonts[fnt]);
-    XftColorFree(dpy, vis, cmap, &bar.foreground);
-    XftColorFree(dpy, vis, cmap, &bar.background);
+    while (drw_ctx.colorcache)
+        CC_FREE(drw_ctx.colorcache);
+    for (int i = 0; i < drw_ctx.nfonts; ++i)
+        XftFontClose(dpy(), drw_ctx.fonts[i]);
+    XftColorFree(dpy(), vis(), cmap(), &bar.foreground);
+    XftColorFree(dpy(), vis(), cmap(), &bar.background);
     XftDrawDestroy(bar.canvas);
-    XCloseDisplay(dpy);
+    XCloseDisplay(dpy());
+}
+
+void clu_load_gui(void)
+{
+    drw_ctx_init(&core->config);
+    bar_init(&core->config);
+    fill_rect(0, 0, bar.window_g.w, bar.window_g.h);
 }
