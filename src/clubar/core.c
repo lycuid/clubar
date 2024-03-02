@@ -12,20 +12,25 @@
 #include <clubar/plugins/luaconfig.h>
 #endif
 
-static inline void argparse(int, char *const *);
+static inline void argparse(void);
 static inline void create_config(void);
-void core_init(int argc, char *const *argv);
+void core_init(void);
+void core_load_external_configs(void);
 void core_update_blks(BlockType, const char *);
 void core_stop_running(void);
+
+static CliArgs local_cli_args = {0, NULL};
+CliArgs *cli_args = &local_cli_args;
 
 static Block blks[2][MAX_BLKS];
 
 static struct Core local = {
-    .running      = true,
-    .nblks        = {0, 0},
-    .init         = core_init,
-    .update_blks  = core_update_blks,
-    .stop_running = core_stop_running,
+    .running               = true,
+    .nblks                 = {0, 0},
+    .init                  = core_init,
+    .load_external_configs = core_load_external_configs,
+    .update_blks           = core_update_blks,
+    .stop_running          = core_stop_running,
 };
 
 const struct Core *const core = &local;
@@ -84,9 +89,10 @@ static inline void usage(void)
     puts("                  comma seperated fonts (eg: 'arial-10,monospace-10:bold').");
     puts("SIGNALS:");
     puts("  USR1: toggle window visibility (e.g. pkill -USR1 clubar).");
+    puts("  USR2: Reload configurations from external config file without reloading.");
 } // clang-format on
 
-static inline void argparse(int argc, char *const *argv)
+static inline void argparse(void)
 {
     Config *c = &local.config;
     int arg, i = 0;
@@ -106,7 +112,8 @@ static inline void argparse(int argc, char *const *argv)
         {NULL,              0,                  NULL, 0},
     }; // clang-format on
 
-    while ((arg = getopt_long(argc, argv, "hvtc:g:p:m:f:b:", opts, &i)) != -1) {
+    while ((arg = getopt_long(cli_args->argc, (char *const *)cli_args->argv,
+                              "hvtc:g:p:m:f:b:", opts, &i)) != -1) {
         switch (arg) {
         case 0: {
             if (strcmp(CONFIG_FONTS, opts[i].name) == 0 && optarg)
@@ -155,8 +162,7 @@ static inline void argparse(int argc, char *const *argv)
             if (optarg)
                 strcpy(ConfigFile, optarg);
             break;
-        default:
-            exit(2);
+        default: exit(2);
         }
     }
 }
@@ -183,12 +189,20 @@ static inline void create_config(void)
     strcpy(local.config.background, background);
 }
 
-void core_init(int argc, char *const *argv)
+void core_init(void)
 {
     local.blks[Stdin]  = blks[Stdin];
     local.blks[Custom] = blks[Custom];
     create_config();
-    argparse(argc, argv);
+    argparse();
+    core_load_external_configs();
+}
+
+void core_load_external_configs(void)
+{
+    blks_free(local.blks[Stdin], MAX_BLKS);
+    blks_free(local.blks[Custom], MAX_BLKS);
+
 #ifdef __ENABLE_PLUGIN__xrmconfig__
     xrmconfig_merge(&local.config);
 #endif

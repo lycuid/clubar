@@ -42,13 +42,21 @@ typedef struct {
     char foreground[16], background[16];
 } Config;
 
+struct CliArgs {
+    int argc;
+    const char **argv;
+};
+typedef struct CliArgs CliArgs;
+extern CliArgs *cli_args;
+
 extern const struct Core {
     bool running;
     Block *blks[2];
     int nblks[2];
     Config config;
 
-    void (*init)(int argc, char *const *argv);
+    void (*init)(void);
+    void (*load_external_configs)(void);
     void (*update_blks)(BlockType, const char *);
     void (*stop_running)(void);
 } *const core;
@@ -59,7 +67,9 @@ void load_fonts_from_string(char *);
  * is being used. */
 
 // Setup and show window.
-void clu_setup(void);
+void clu_init(void);
+// setting up the gui (window), using the provided configs.
+void clu_load_gui(void);
 // Clear window canvas.
 void clu_clear(BlockType);
 // render on the window canvas.

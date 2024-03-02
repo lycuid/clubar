@@ -1,6 +1,7 @@
 ---
 AlignConsecutiveAssignments: true
 AlignConsecutiveMacros: true
+AllowShortCaseLabelsOnASingleLine: true
 BreakBeforeBraces: Linux
 IndentWidth: 4
 ---

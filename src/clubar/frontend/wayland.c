@@ -3,6 +3,7 @@
 #define UNIMPLEMENTED die("Wayland currently not supported.\n")
 
 void clu_setup(void) { UNIMPLEMENTED; }
+void clu_load_gui(void) { UNIMPLEMENTED; }
 void clu_clear(__attribute__((unused)) BlockType _) { UNIMPLEMENTED; }
 void clu_render(__attribute__((unused)) BlockType _) { UNIMPLEMENTED; }
 void clu_toggle(void) { UNIMPLEMENTED; }

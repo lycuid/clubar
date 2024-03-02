@@ -62,6 +62,7 @@ OPTIONS:
                   comma seperated fonts (eg: 'arial-10,monospace-10:bold').
 SIGNALS:
   USR1: toggle window visibility (e.g. pkill -USR1 clubar).
+  USR2: Reload configurations from external config file without reloading.
 ```
 Requirements
 ------------
