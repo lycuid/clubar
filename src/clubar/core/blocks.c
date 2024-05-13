@@ -53,11 +53,13 @@ static inline TagName parse_tagname(Parser *parser)
 
 static inline TagModifierMask parse_tagmodifier(Parser *parser, TagName name)
 {
-    const TagModifier *mods = ValidTagModifiers[name];
-    for (int e = 0; mods[e] != NullTagModifier; ++e) {
-        int len = strlen(TagModifierRepr[mods[e]]);
-        if (p_consume_string(parser, TagModifierRepr[mods[e]], len))
-            return mods[e];
+    TagModifierMask valid_mask = ValidTagModifiers[name];
+    for (TagModifier tmod = 0; tmod < NullTagModifier; ++tmod) {
+        if (valid_mask & (1 << tmod)) {
+            int len = strlen(TagModifierRepr[tmod]);
+            if (p_consume_string(parser, TagModifierRepr[tmod], len))
+                return tmod;
+        }
     }
     return NullTagModifier;
 }

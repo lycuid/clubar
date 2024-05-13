@@ -1,8 +1,7 @@
-#ifndef __CORE__BLKS__ALLOCATOR_H__
-#define __CORE__BLKS__ALLOCATOR_H__
+#ifndef __CORE__TAGS_H__
+#define __CORE__TAGS_H__
 
 #include <stdint.h>
-#include <stdlib.h>
 
 #define BLK_BUFFER_SIZE (1 << 10)
 
@@ -22,16 +21,17 @@ typedef struct Tag {
     struct Tag *previous;
 } Tag;
 
-static const TagModifier ValidTagModifiers[NullTagName][NullTagModifier] = {
-    [Fn]    = {NullTagModifier},
-    [Fg]    = {NullTagModifier},
-    [Bg]    = {NullTagModifier},
-    [Box]   = {Left, Right, Top, Bottom, NullTagModifier},
-    [BtnL]  = {Shift, Ctrl, Super, Alt, NullTagModifier},
-    [BtnM]  = {Shift, Ctrl, Super, Alt, NullTagModifier},
-    [BtnR]  = {Shift, Ctrl, Super, Alt, NullTagModifier},
-    [ScrlU] = {Shift, Ctrl, Super, Alt, NullTagModifier},
-    [ScrlD] = {Shift, Ctrl, Super, Alt, NullTagModifier}};
+static const TagModifierMask ValidTagModifiers[NullTagName] = {
+    [Fn]    = 0,
+    [Fg]    = 0,
+    [Bg]    = 0,
+    [Box]   = (1 << Left) | (1 << Right) | (1 << Top) | (1 << Bottom),
+    [BtnL]  = (1 << Shift) | (1 << Ctrl) | (1 << Super) | (1 << Alt),
+    [BtnM]  = (1 << Shift) | (1 << Ctrl) | (1 << Super) | (1 << Alt),
+    [BtnR]  = (1 << Shift) | (1 << Ctrl) | (1 << Super) | (1 << Alt),
+    [ScrlU] = (1 << Shift) | (1 << Ctrl) | (1 << Super) | (1 << Alt),
+    [ScrlD] = (1 << Shift) | (1 << Ctrl) | (1 << Super) | (1 << Alt),
+};
 
 #define REPR(sym) [sym] = #sym
 static const char *const TagNameRepr[NullTagName] = {

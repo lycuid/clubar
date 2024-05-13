@@ -229,11 +229,10 @@ static inline void xrender_box(const Block *blk, const GlyphInfo *gi)
         int size = parse_box_string(box->val, color);
         if (!size)
             continue;
-        const TagModifier *mods = ValidTagModifiers[Box];
-        for (int e = 0; mods[e] != NullTagModifier; ++e) {
+        for (TagModifier tmod = 0; tmod != NullTagModifier; ++tmod) {
             int bx = canvas_g->x, by = canvas_g->y, bw = 0, bh = 0;
-            if (box->tmod_mask & (1 << mods[e])) {
-                switch (mods[e]) {
+            if (box->tmod_mask & (1 << tmod)) {
+                switch (tmod) {
                 case Left: {
                     bx = gi->x, bw = size, bh = canvas_g->h;
                 } break;

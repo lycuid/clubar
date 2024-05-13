@@ -1,4 +1,5 @@
 #include "tags.h"
+#include <stdlib.h>
 #include <string.h>
 
 #define TAG_STASH_CAPACITY (1 << 5)
