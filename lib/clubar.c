@@ -1,5 +1,5 @@
-#include "core.h"
-#include "config.h"
+#include "clubar.h"
+#include "../src/config.h"
 #include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,33 +12,18 @@
 #include <clubar/plugins/luaconfig.h>
 #endif
 
-static inline void argparse(void);
-static inline void create_config(void);
-void core_init(void);
-void core_load_external_configs(void);
-void core_update_blks(BlockType, const char *);
-void core_stop_running(void);
+static inline void argparse(CluBar *);
+static inline void create_config(CluBar *);
 
 static CliArgs local_cli_args = {0, NULL};
-CliArgs *cli_args = &local_cli_args;
+CliArgs *cli_args             = &local_cli_args;
 
 static Block blks[2][MAX_BLKS];
 
-static struct Core local = {
-    .running               = true,
-    .nblks                 = {0, 0},
-    .init                  = core_init,
-    .load_external_configs = core_load_external_configs,
-    .update_blks           = core_update_blks,
-    .stop_running          = core_stop_running,
-};
-
-const struct Core *const core = &local;
 static char ConfigFile[1 << 10];
 
-void load_fonts_from_string(char *str)
+void load_fonts_from_string(char *str, Config *c)
 {
-    Config *c = &local.config;
     if (c->fonts) {
         for (int i = 0; i < c->nfonts; ++i)
             free(c->fonts[i]);
@@ -92,9 +77,9 @@ static inline void usage(void)
     puts("  USR2: Reload configurations from external config file without reloading.");
 } // clang-format on
 
-static inline void argparse(void)
+static inline void argparse(CluBar *clubar)
 {
-    Config *c = &local.config;
+    Config *c = &clubar->config;
     int arg, i = 0;
 
     // clang-format off
@@ -117,7 +102,7 @@ static inline void argparse(void)
         switch (arg) {
         case 0: {
             if (strcmp(CONFIG_FONTS, opts[i].name) == 0 && optarg)
-                load_fonts_from_string(optarg);
+                load_fonts_from_string(optarg, c);
         } break;
         case 'h': {
             usage();
@@ -175,46 +160,43 @@ static inline void argparse(void)
 #undef CONFIG_BACKGROUND
 #undef CONFIG_FONTS
 
-static inline void create_config(void)
+static inline void create_config(CluBar *clubar)
 {
-    local.config.nfonts = sizeof(fonts) / sizeof(*fonts);
-    local.config.fonts  = malloc(local.config.nfonts * sizeof(char *));
-    for (int i = 0; i < local.config.nfonts; ++i)
-        local.config.fonts[i] = strdup(fonts[i]);
-    local.config.geometry = geometry;
-    local.config.padding  = padding;
-    local.config.margin   = margin;
-    local.config.topbar   = topbar;
-    strcpy(local.config.foreground, foreground);
-    strcpy(local.config.background, background);
+    clubar->config.nfonts = sizeof(fonts) / sizeof(*fonts);
+    clubar->config.fonts  = malloc(clubar->config.nfonts * sizeof(char *));
+    for (int i = 0; i < clubar->config.nfonts; ++i)
+        clubar->config.fonts[i] = strdup(fonts[i]);
+    clubar->config.geometry = geometry;
+    clubar->config.padding  = padding;
+    clubar->config.margin   = margin;
+    clubar->config.topbar   = topbar;
+    strcpy(clubar->config.foreground, foreground);
+    strcpy(clubar->config.background, background);
 }
 
-void core_init(void)
+void clubar_init(CluBar *clubar)
 {
-    local.blks[Stdin]  = blks[Stdin];
-    local.blks[Custom] = blks[Custom];
-    create_config();
-    argparse();
-    core_load_external_configs();
+    clubar->blks[Stdin]  = blks[Stdin];
+    clubar->blks[Custom] = blks[Custom];
+    create_config(clubar);
+    argparse(clubar);
 }
 
-void core_load_external_configs(void)
+void clubar_load_external_configs(CluBar *clubar)
 {
-    blks_free(local.blks[Stdin], MAX_BLKS);
-    blks_free(local.blks[Custom], MAX_BLKS);
+    blks_free(clubar->blks[Stdin], MAX_BLKS);
+    blks_free(clubar->blks[Custom], MAX_BLKS);
 
 #ifdef __ENABLE_PLUGIN__xrmconfig__
-    xrmconfig_merge(&local.config);
+    xrmconfig_merge(&clubar->config);
 #endif
 #ifdef __ENABLE_PLUGIN__luaconfig__
-    luaconfig_merge(ConfigFile, &local.config);
+    luaconfig_merge(ConfigFile, &clubar->config);
 #endif
 }
 
-void core_update_blks(BlockType blktype, const char *buffer)
+void clubar_update_blks(CluBar *clubar, BlockType blktype, const char *buffer)
 {
-    blks_free(local.blks[blktype], MAX_BLKS);
-    local.nblks[blktype] = blks_create(local.blks[blktype], buffer);
+    blks_free(clubar->blks[blktype], MAX_BLKS);
+    clubar->nblks[blktype] = blks_create(clubar->blks[blktype], buffer);
 }
-
-void core_stop_running(void) { local.running = false; }

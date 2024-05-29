@@ -1,0 +1,11 @@
+-Wall
+-Wextra
+-Wvla
+-pedantic
+-Ofast
+-ggdb
+-D_GNU_SOURCE
+-DNAME="clubar"
+-DVERSION="0.5.1"
+-fPIC
+-I.

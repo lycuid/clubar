@@ -1,6 +1,3 @@
-#ifndef __CORE__BLOCKS_H__
-#define __CORE__BLOCKS_H__
-
 /*
  * <Bg=#efefef>
  *    <Fg=#090909>
@@ -44,7 +41,10 @@
  * };
  */
 
-#include <clubar/core/tags.h>
+#ifndef __CLUBAR__BLOCKS_H__
+#define __CLUBAR__BLOCKS_H__
+
+#include <clubar/tags.h>
 
 typedef struct {
     char text[BLK_BUFFER_SIZE];

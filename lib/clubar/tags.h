@@ -1,5 +1,5 @@
-#ifndef __CORE__TAGS_H__
-#define __CORE__TAGS_H__
+#ifndef __CLUBAR__TAGS_H__
+#define __CLUBAR__TAGS_H__
 
 #include <stdint.h>
 

@@ -1,26 +1,25 @@
 include config.mk
 
-.PHONY: x11 wayland
-x11: $(OBJS) $(ODIR)/$(FRONTEND)/x11.o
-	mkdir -p $(shell dirname $(BIN)) && $(CC) $(CFLAGS) $(LDFLAGS) -o $(BIN) $^
+BIN:=$(BUILD)/bin/$(NAME)
+PREFIX:=/usr/local
+BINPREFIX:=$(PREFIX)/bin
+MANPREFIX:=$(PREFIX)/man/man1
 
-# @TODO: Not Implemented.
-wayland: $(OBJS) $(ODIR)/$(FRONTEND)/wayland.o
-	mkdir -p $(shell dirname $(BIN)) && $(CC) $(CFLAGS) $(LDFLAGS) -o $(BIN) $^
+.PHONY: with_x11 wayland
+with_x11: ; mkdir -p $(shell dirname $(BIN))
+	$(MAKE) -C src/$@
+	cp src/$@/$(BIN) $(BIN)
 
-$(ODIR)/%.o: $(IDIR)/%.c $(IDIR)/%.h
-	mkdir -p $(@D) && $(CC) $(CFLAGS) -c -o $@ $<
-$(ODIR)/%.o: $(IDIR)/%.c
-	mkdir -p $(@D) && $(CC) $(CFLAGS) -c -o $@ $<
-$(OBJS): $(IDIR)/config.h
+.PHONY: lib
+lib:
+	$(MAKE) -j -C lib
 
 .PHONY: options
 options:
 	@echo "$(NAME) build options:"
 	@echo "CC       = $(CC)"
-	@echo "PKGS     = $(PKGS)"
 	@echo "PLUGINS  = $(PLUGINS)"
-	@echo "SRC      = $(SRC)"
+	@echo "SRCS     = $(SRCS)"
 	@echo "LDFLAGS  = $(LDFLAGS)"
 	@echo "CFLAGS   = $(CFLAGS)"
 	@echo "----------------------------------"
@@ -39,10 +38,13 @@ uninstall:
 	$(RM) $(DESTDIR)$(BINPREFIX)/$(NAME)
 
 # misc.
-.PHONY: clean fmt loc debug run
-clean: ; rm -rf $(BUILD)
+.PHONY: fmt run debug clean compile_flags
 fmt: ; @git ls-files | grep -E '\.[ch]$$' | xargs clang-format -i
-loc: ; @git ls-files | grep -E '\.[ch]$$' | xargs wc -l
 run: $(BIN) ; $(BIN) $(ARGS)
 debug: $(BIN) ; @gdb $(BIN)
-compile_flags: ; @echo $(CFLAGS) | tr ' ' '\n' > compile_flags.txt
+clean: ; rm -rf $(BUILD)
+	$(MAKE) -C lib $@
+	$(MAKE) -C src/with_x11 $@
+compile_flags:
+	$(MAKE) -C lib $@
+	$(MAKE) -C src/with_x11 $@

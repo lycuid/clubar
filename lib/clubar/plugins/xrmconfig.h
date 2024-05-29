@@ -1,3 +1,3 @@
-#include <clubar/core.h>
+#include <clubar.h>
 
 void xrmconfig_merge(Config *);

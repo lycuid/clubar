@@ -24,7 +24,7 @@ void xrmconfig_merge(Config *config)
 
     if (XrmGetResource(db, NAME ".fonts", "*", &value, &xrm_value) &&
         xrm_value.size > 0)
-        load_fonts_from_string(xrm_value.addr);
+        load_fonts_from_string(xrm_value.addr, config);
 
     if (XrmGetResource(db, NAME ".geometry", "*", &value, &xrm_value))
         if (sscanf(xrm_value.addr, "%u,%u,%u,%u", &config->geometry.x,
