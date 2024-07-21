@@ -158,7 +158,7 @@ int main(int argc, char const **argv)
 
     // spawn thread and wait (for the window to load).
     pthread_create(&stdin_thread, NULL, stdin_thread_handler, NULL);
-    pthread_create(&sig_thread, NULL, sig_thread_handler, &sig_set);
+    pthread_create(&sig_thread, NULL, sig_thread_handler, (void *)&sig_set);
 
     clubar_load_external_configs(clubar);
     gui_load();

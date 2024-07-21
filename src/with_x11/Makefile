@@ -1,8 +1,8 @@
 include ../../config.mk
 
-IDIR:=.
+I_DIR:=.
 LIB:=../../lib
-OBJS:=$(ODIR)/main.o $(ODIR)/gui.o
+O_FILES:=$(O_DIR)/main.o $(O_DIR)/gui.o
 
 PKGS:=x11 xft
 ifneq ($(filter luaconfig,$(PLUGINS)),)
@@ -10,19 +10,21 @@ ifneq ($(filter luaconfig,$(PLUGINS)),)
 endif
 
 override CFLAGS+= $(FLAGS) $(DEFINE) -I$(LIB) $(shell pkg-config --cflags $(PKGS))
-LDFLAGS:=-lpthread $(shell pkg-config --libs $(PKGS))
+LDFLAGS:=-L$(LIB)/$(BUILD) -l$(NAME) -lpthread $(shell pkg-config --libs $(PKGS))
 
-$(BIN): $(LIB) $(OBJS) ; mkdir -p $(@D)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) -L$(LIB)/$(BUILD) -l$(NAME)
+all: $(BIN)
+
+$(BIN): $(LIB) $(O_FILES) ; mkdir -p $(@D)
+	$(CC) $(CFLAGS) -o $@ $(O_FILES) $(LDFLAGS)
 
 .PHONY: $(LIB)
 $(LIB):
 	$(MAKE) -j -C $@
 
-$(ODIR)/%.o: $(IDIR)/%.c $(IDIR)/%.h; @mkdir -p $(@D)
+$(O_DIR)/%.o: $(I_DIR)/%.c $(I_DIR)/%.h; @mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(ODIR)/%.o: $(IDIR)/%.c ; @mkdir -p $(@D)
+$(O_DIR)/%.o: $(I_DIR)/%.c ; @mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 .PHONY: clean compile_flags

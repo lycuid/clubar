@@ -87,20 +87,6 @@ static XftColor *request_color(const char *colorname)
     return &drw.colorcache->val;
 }
 
-static inline int parse_box_string(const char *val, char color[32])
-{
-    int cursor = 0, c = 0, nval = strlen(val), size = 0;
-    memset(color, 0, 32);
-    while (cursor < nval && val[cursor] != ':')
-        color[c++] = val[cursor++];
-    if (val[cursor++] == ':')
-        while (cursor < nval && val[cursor] >= '0' && val[cursor] <= '9')
-            size = size * 10 + val[cursor++] - '0';
-    if (cursor < nval - 1 && (size = -1) == -1)
-        eprintf("Invalid Box template string: '%s'\n", val);
-    return size + (size <= 0);
-}
-
 static inline void drw_init(const Config *config)
 {
     // As this function can be called multiple times, we need to deallocate the
@@ -173,6 +159,14 @@ static inline void bar_init(const Config *config)
                          !clubar->config.topbar ? barheight : 0};
         XChangeProperty(dpy(), bar.window, atoms[NetWMStrut], XA_CARDINAL, 32,
                         PropModeReplace, (uint8_t *)strut, 4l);
+        if (strlen(clubar->config.border_color) > 0) {
+            XftColor *color = request_color(clubar->config.border_color);
+            XSetWindowBorder(dpy(), bar.window, color->pixel);
+            XSetWindowBorderWidth(dpy(), bar.window,
+                                  clubar->config.border_width);
+        } else {
+            XSetWindowBorderWidth(dpy(), bar.window, 0);
+        }
     }
 }
 
@@ -217,7 +211,7 @@ static inline void xrender_box(const Block *blk, const GlyphInfo *gi)
     char color[32];
     const Geometry *canvas_g = &bar.canvas_g;
     for (Tag *box = blk->tags[Box]; box != NULL; box = box->previous) {
-        int size = parse_box_string(box->val, color);
+        int size = parse_color_string(box->val, color);
         if (!size)
             continue;
         for (TagModifier tmod = 0; tmod != NullTagModifier; ++tmod) {

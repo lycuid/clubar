@@ -57,6 +57,11 @@ void xrmconfig_merge(Config *config)
     if (XrmGetResource(db, NAME ".background", "*", &value, &xrm_value))
         memcpy(config->background, xrm_value.addr, xrm_value.size);
 
+    char border[32] = {0};
+    if (XrmGetResource(db, NAME ".border", "*", &value, &xrm_value))
+        memcpy(border, xrm_value.addr, xrm_value.size);
+    config->border_width = parse_color_string(border, config->border_color);
+
     XrmDestroyDatabase(db);
     XCloseDisplay(dpy);
 }

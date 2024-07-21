@@ -87,5 +87,9 @@ void luaconfig_merge(const char *luafile, Config *config)
     GetString(L, 1, "foreground", (char *)config->foreground);
     GetString(L, 1, "background", (char *)config->background);
 
+    char border[32] = {0};
+    GetString(L, 1, "border", (char *)border);
+    config->border_width = parse_color_string(border, config->border_color);
+
     load_fonts(L, config);
 }
