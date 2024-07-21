@@ -3,12 +3,13 @@
 ! Or this file can be merged with the X Resource database.
 ! Reference: https://wiki.archlinux.org/title/x_resources
 
-clubar.geometry: 0, 0, 1366, 32
-clubar.padding: 0, 0, 0, 0
-clubar.margin: 0, 0, 0, 0
-clubar.topbar: true
+clubar.geometry: -2,734,1366,32
+clubar.padding: 0,0,0,0
+clubar.margin: 0,0,2,0
+clubar.topbar: false
 clubar.foreground: #efefef
 clubar.background: #090909
-clubar.fonts: monospace-11, monospace-11:bold
+clubar.border: #089CAC:2
+clubar.fonts: monospace-9, monospace-9:bold
 
 ! vim:ft=xdefaults

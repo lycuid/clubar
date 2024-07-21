@@ -172,6 +172,8 @@ static inline void create_config(CluBar *clubar)
     clubar->config.topbar   = topbar;
     strcpy(clubar->config.foreground, foreground);
     strcpy(clubar->config.background, background);
+    clubar->config.border_width =
+        parse_color_string(border, clubar->config.border_color);
 }
 
 void clubar_init(CluBar *clubar)

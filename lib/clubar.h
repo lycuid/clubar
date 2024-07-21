@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #define MAX_BLKS (1 << 6)
 
@@ -27,12 +28,28 @@ typedef struct {
     uint32_t left, right, top, bottom;
 } Direction;
 
+static inline int parse_color_string(const char *val, char color[32])
+{
+    int cursor = 0, c = 0, nval = strlen(val), size = 0;
+    memset(color, 0, 32);
+    while (cursor < nval && val[cursor] != ':')
+        color[c++] = val[cursor++];
+    if (val[cursor++] == ':')
+        while (cursor < nval && val[cursor] >= '0' && val[cursor] <= '9')
+            size = size * 10 + val[cursor++] - '0';
+    if (cursor < nval - 1 && (size = -1) == -1)
+        eprintf("Invalid Color template string: '%s'\n", val);
+    return size + (size <= 0);
+}
+
 typedef struct {
     int nfonts;
     char **fonts;
     int topbar;
     Geometry geometry;
     Direction padding, margin;
+    unsigned int border_width;
+    char border_color[32];
     char foreground[16], background[16];
 } Config;
 
