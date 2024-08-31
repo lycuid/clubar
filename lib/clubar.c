@@ -47,6 +47,7 @@ void load_fonts_from_string(char *str, Config *c)
 #define CONFIG_PADDING    "padding"
 #define CONFIG_MARGIN     "margin"
 #define CONFIG_TOPBAR     "topbar"
+#define CONFIG_BORDER     "border"
 #define CONFIG_FOREGROUND "foreground"
 #define CONFIG_BACKGROUND "background"
 #define CONFIG_FONTS      "fonts"
@@ -60,17 +61,19 @@ static inline void usage(void)
     puts("  -t, --topbar    window position (top/bottom edge of the screen).");
     puts("  -c file, --config[=file]");
     puts("                  filepath for runtime configs (supports: lua).");
-    puts("  -g values, --" CONFIG_GEOMETRY "[=values]");
+    puts("  --" CONFIG_GEOMETRY " values");
     puts("                  window geometry as 'x,y,width,height' (eg: '0,0,1280,720').");
-    puts("  -p values, --" CONFIG_PADDING "[=values]");
+    puts("  --" CONFIG_PADDING " values");
     puts("                  window padding as 'left,right,top,bot' (eg: '0,0,10,10').");
-    puts("  -m values, --" CONFIG_MARGIN "[=values]");
+    puts("  --" CONFIG_MARGIN " values");
     puts("                  window margin as 'left,right,top,bot' (eg: '0,0,10,10').");
-    puts("  -f color, --" CONFIG_FOREGROUND "[=color]");
+    puts("  --" CONFIG_BORDER " value");
+    puts("                  window border as 'color:width' (eg: '#ee33ee:2', '#ddd').");
+    puts("  --" CONFIG_FOREGROUND " color");
     puts("                  set default foreground color.");
-    puts("  -b color, --" CONFIG_BACKGROUND "[=color]");
+    puts("  --" CONFIG_BACKGROUND " color");
     puts("                  set default background color.");
-    puts("  --" CONFIG_FONTS "[=values]");
+    puts("  --" CONFIG_FONTS " values");
     puts("                  comma seperated fonts (eg: 'arial-10,monospace-10:bold').");
     puts("SIGNALS:");
     puts("  USR1: toggle window visibility (e.g. pkill -USR1 clubar).");
@@ -84,26 +87,23 @@ static inline void argparse(CluBar *clubar)
 
     // clang-format off
     struct option opts[] = {
-        {CONFIG_GEOMETRY,   required_argument,  0, 'g'},
-        {CONFIG_PADDING,    required_argument,  0, 'p'},
-        {CONFIG_MARGIN,     required_argument,  0, 'm'},
-        {CONFIG_TOPBAR,     no_argument,        &c->topbar, 1},
-        {CONFIG_FOREGROUND, required_argument,  0, 'f'},
-        {CONFIG_BACKGROUND, required_argument,  0, 'b'},
-        {CONFIG_FONTS,      required_argument,  0, 0},
-        {"help",            no_argument,        0, 'h'},
-        {"version",         no_argument,        0, 'v'},
-        {"config",          required_argument,  0, 'c'},
-        {NULL,              0,                  NULL, 0},
+        {CONFIG_GEOMETRY,   required_argument,  0,          0 },
+        {CONFIG_PADDING,    required_argument,  0,          0 },
+        {CONFIG_MARGIN,     required_argument,  0,          0 },
+        {CONFIG_TOPBAR,     no_argument,        &c->topbar, 1   },
+        {CONFIG_BORDER,     required_argument,  0,          0 },
+        {CONFIG_FOREGROUND, required_argument,  0,          0   },
+        {CONFIG_BACKGROUND, required_argument,  0,          0   },
+        {CONFIG_FONTS,      required_argument,  0,          0   },
+        {"help",            no_argument,        0,          'h' },
+        {"version",         no_argument,        0,          'v' },
+        {"config",          required_argument,  0,          'c' },
+        {NULL,              0,                  NULL,       0   },
     }; // clang-format on
 
     while ((arg = getopt_long(cli_args->argc, (char *const *)cli_args->argv,
-                              "hvtc:g:p:m:f:b:", opts, &i)) != -1) {
+                              "hvtc:g:p:m:b:", opts, &i)) != -1) {
         switch (arg) {
-        case 0: {
-            if (strcmp(CONFIG_FONTS, opts[i].name) == 0 && optarg)
-                load_fonts_from_string(optarg, c);
-        } break;
         case 'h': {
             usage();
             exit(EXIT_SUCCESS);
@@ -115,38 +115,41 @@ static inline void argparse(CluBar *clubar)
         case 't': {
             c->topbar = 1;
         } break;
-        case 'g': {
-            if (optarg)
-                if (sscanf(optarg, "%u,%u,%u,%u", &c->geometry.x,
-                           &c->geometry.y, &c->geometry.w, &c->geometry.h) != 4)
-                    die("Invalid value for argument: '" CONFIG_GEOMETRY "'.\n");
+        case 0: {
+            if (optarg) {
+                if (strcmp(CONFIG_GEOMETRY, opts[i].name) == 0) {
+                    if (sscanf(optarg, "%u,%u,%u,%u", &c->geometry.x,
+                               &c->geometry.y, &c->geometry.w,
+                               &c->geometry.h) != 4)
+                        die("Invalid value for argument: '" CONFIG_GEOMETRY
+                            "'.\n");
+                } else if (strcmp(CONFIG_PADDING, opts[i].name) == 0) {
+                    if (sscanf(optarg, "%u,%u,%u,%u", &c->padding.left,
+                               &c->padding.right, &c->padding.top,
+                               &c->padding.bottom) != 4)
+                        die("Invalid value for argument: '" CONFIG_PADDING
+                            "'.\n");
+                } else if (strcmp(CONFIG_MARGIN, opts[i].name) == 0) {
+                    if (sscanf(optarg, "%u,%u,%u,%u", &c->margin.left,
+                               &c->margin.right, &c->margin.top,
+                               &c->margin.bottom) != 4)
+                        die("Invalid value for argument: '" CONFIG_MARGIN
+                            "'.\n");
+                } else if (strcmp(CONFIG_BORDER, opts[i].name) == 0) {
+                    c->border_width =
+                        parse_color_string(optarg, c->border_color);
+                } else if (strcmp("config", opts[i].name) == 0) {
+                    strcpy(ConfigFile, optarg);
+                } else if (strcmp(CONFIG_FOREGROUND, opts[i].name) == 0) {
+                    strcpy(c->foreground, optarg);
+                } else if (strcmp(CONFIG_BACKGROUND, opts[i].name) == 0) {
+                    strcpy(c->background, optarg);
+                } else if (strcmp(CONFIG_FONTS, opts[i].name) == 0) {
+                    load_fonts_from_string(optarg, c);
+                }
+            }
         } break;
-        case 'p': {
-            if (optarg)
-                if (sscanf(optarg, "%u,%u,%u,%u", &c->padding.left,
-                           &c->padding.right, &c->padding.top,
-                           &c->padding.bottom) != 4)
-                    die("Invalid value for argument: '" CONFIG_PADDING "'.\n");
-        } break;
-        case 'm': {
-            if (optarg)
-                if (sscanf(optarg, "%u,%u,%u,%u", &c->padding.left,
-                           &c->padding.right, &c->padding.top,
-                           &c->padding.bottom) != 4)
-                    die("Invalid value for argument: '" CONFIG_MARGIN "'.\n");
-        } break;
-        case 'f': {
-            if (optarg)
-                strcpy(c->foreground, optarg);
-        } break;
-        case 'b': {
-            if (optarg)
-                strcpy(c->background, optarg);
-        } break;
-        case 'c':
-            if (optarg)
-                strcpy(ConfigFile, optarg);
-            break;
+
         default: exit(2);
         }
     }
@@ -156,6 +159,7 @@ static inline void argparse(CluBar *clubar)
 #undef CONFIG_PADDING
 #undef CONFIG_MARGIN
 #undef CONFIG_TOPBAR
+#undef CONFIG_BORDER
 #undef CONFIG_FOREGROUND
 #undef CONFIG_BACKGROUND
 #undef CONFIG_FONTS
@@ -170,10 +174,10 @@ static inline void create_config(CluBar *clubar)
     clubar->config.padding  = padding;
     clubar->config.margin   = margin;
     clubar->config.topbar   = topbar;
-    strcpy(clubar->config.foreground, foreground);
-    strcpy(clubar->config.background, background);
     clubar->config.border_width =
         parse_color_string(border, clubar->config.border_color);
+    strcpy(clubar->config.foreground, foreground);
+    strcpy(clubar->config.background, background);
 }
 
 void clubar_init(CluBar *clubar)

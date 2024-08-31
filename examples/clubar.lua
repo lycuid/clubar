@@ -19,8 +19,8 @@ Config = {
     padding = padding,
     margin = margin,
     topbar = true,
+    border = "#ee33ee:" .. border_width,
     foreground = "#efefef",
     background = "#090909",
-    border = "#ee33ee:" .. border_width,
     fonts = {"monospace-9", "monospace-9:bold"},
 };

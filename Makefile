@@ -5,27 +5,15 @@ PREFIX:=/usr/local
 BINPREFIX:=$(PREFIX)/bin
 MANPREFIX:=$(PREFIX)/man/man1
 
-.PHONY: with_x11 wayland
+.PHONY: with_x11 lib
 with_x11: ; mkdir -p $(shell dirname $(BIN))
 	$(MAKE) -C src/$@
 	cp src/$@/$(BIN) $(BIN)
 
-.PHONY: lib
-lib:
-	$(MAKE) -j -C lib
-
-.PHONY: options
-options:
-	@echo "$(NAME) build options:"
-	@echo "CC       = $(CC)"
-	@echo "PLUGINS  = $(PLUGINS)"
-	@echo "SRCS     = $(SRCS)"
-	@echo "LDFLAGS  = $(LDFLAGS)"
-	@echo "CFLAGS   = $(CFLAGS)"
-	@echo "----------------------------------"
+lib: ; $(MAKE) -j -C lib
 
 .PHONY: install uninstall
-install: options $(BIN)
+install: $(BIN)
 	mkdir -p $(DESTDIR)$(BINPREFIX)
 	strip $(BIN)
 	cp -f $(BIN) $(DESTDIR)$(BINPREFIX)/$(NAME)
@@ -37,7 +25,6 @@ install: options $(BIN)
 uninstall:
 	$(RM) $(DESTDIR)$(BINPREFIX)/$(NAME)
 
-# misc.
 .PHONY: fmt run debug clean compile_flags
 fmt: ; @git ls-files | grep -E '\.[ch]$$' | xargs clang-format -i
 run: $(BIN) ; $(BIN) $(ARGS)
