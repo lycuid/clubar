@@ -2,13 +2,14 @@ include config.mk
 
 BIN:=$(BUILD)/bin/$(NAME)
 PREFIX:=/usr/local
+FRONTEND:=frontend
 BINPREFIX:=$(PREFIX)/bin
 MANPREFIX:=$(PREFIX)/man/man1
 
-.PHONY: with_x11 lib
-with_x11: ; mkdir -p $(shell dirname $(BIN))
-	$(MAKE) -C src/$@
-	cp src/$@/$(BIN) $(BIN)
+.PHONY: frontend/x11 lib
+$(FRONTEND)/x11: lib; mkdir -p $(shell dirname $(BIN))
+	$(MAKE) -C $@
+	cp $@/$(BIN) $(BIN)
 
 lib: ; $(MAKE) -j -C lib
 
@@ -31,7 +32,7 @@ run: $(BIN) ; $(BIN) $(ARGS)
 debug: $(BIN) ; @gdb $(BIN)
 clean: ; rm -rf $(BUILD)
 	$(MAKE) -C lib $@
-	$(MAKE) -C src/with_x11 $@
+	$(MAKE) -C $(FRONTEND)/x11 $@
 compile_flags:
 	$(MAKE) -C lib $@
-	$(MAKE) -C src/with_x11 $@
+	$(MAKE) -C $(FRONTEND)/x11 $@

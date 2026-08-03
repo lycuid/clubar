@@ -1,5 +1,5 @@
 #include "clubar.h"
-#include "../src/config.h"
+#include "config.h"
 #include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,9 +11,6 @@
 #ifdef __ENABLE_PLUGIN__luaconfig__
 #include <clubar/plugins/luaconfig.h>
 #endif
-
-static inline void argparse(CluBar *);
-static inline void create_config(CluBar *);
 
 static CliArgs local_cli_args = {0, NULL};
 CliArgs *cli_args             = &local_cli_args;
