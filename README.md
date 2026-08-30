@@ -1,8 +1,8 @@
 cluless statusbar
 -----------------
-A minialistic, lightweight, customizable statusbar (formerly *xdbar*), inspired by [xmobar](https://xmobar.org/) and [dwm](https://dwm.suckless.org/)'s statusbar, for X11 Desktops (wayland in progress), that are compatible with [EWMH](https://specifications.freedesktop.org/wm-spec/latest/) specifications.
+A minialistic, lightweight, customizable statusbar, inspired by [xmobar](https://xmobar.org/) and [dwm](https://dwm.suckless.org/)'s statusbar, for X11 Desktops, that are compatible with [EWMH](https://specifications.freedesktop.org/wm-spec/latest/) specifications.
 
-Rendering styled/clickable text, is inspired by xmobar's approach of wrapping text in XML like *tags*.  
+Rendering styled/clickable text, is inspired by xmobar's approach of wrapping text in XML like *tags*.
 Populating statusbar is inspired by dwm statusbar's approach of using the root window's `WM_NAME` attribute text.
 
 ![dark.png](https://raw.githubusercontent.com/lycuid/assets/master/clubar/dark.png)
@@ -66,14 +66,8 @@ SIGNALS:
 ```
 Requirements
 ------------
-  - ***free***, ***libre*** and ***open source*** Operating System (currently doesn't support \*BSD).
-  - gnu make
   - libx11
   - libxft
-
-**Optional**
-  - pkg-config  (if not installed, update `config.mk` accordingly).
-  - lua         (required if using `luaconfig` plugin).
 
 Build
 -----
@@ -90,7 +84,7 @@ make PLUGINS="luaconfig xrmconfig ..."
 sudo make install
 ```
 
-**Available Plugins** 
+**Available Plugins**
 (Note: plugins are just space seperated c filenames, from [plugins](/src/clubar/plugins/) directory, without file extension, see [examples](/examples).)
 
 - **luaconfig**: runtime config support with lua source file.
